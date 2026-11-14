@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Suspense } from "react";
+import { MenuUtente } from "./menu-utente";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,13 +20,6 @@ export const metadata: Metadata = {
   description: "Monitoraggio della normativa di sostenibilità UE e Italia",
 };
 
-const voci = [
-  { href: "/normative", label: "Normative" },
-  { href: "/settori", label: "Settori" },
-  { href: "/clienti", label: "Clienti" },
-  { href: "/notizie", label: "Notizie" },
-];
-
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -36,13 +31,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Link href="/" className="font-semibold">
             Monitoraggio ESG
           </Link>
-          <nav className="flex gap-4 text-sm">
-            {voci.map((v) => (
-              <Link key={v.href} href={v.href} className="hover:underline">
-                {v.label}
-              </Link>
-            ))}
-          </nav>
+          <Suspense>
+            <MenuUtente />
+          </Suspense>
         </header>
         <main className="flex-1 px-6 py-6">{children}</main>
       </body>

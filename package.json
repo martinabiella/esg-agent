@@ -10,9 +10,11 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed-settori.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/lib/*.test.ts"
   },
   "dependencies": {
+    "@neon/auth": "^0.8.2",
     "@neondatabase/serverless": "^1.2.1",
     "drizzle-orm": "^0.45.4",
     "next": "16.4.6",
