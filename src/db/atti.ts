@@ -11,6 +11,7 @@ export async function attiDelSettore(settoreId: number) {
       id: attoNormativo.id,
       titolo: attoNormativo.titolo,
       giurisdizione: attoNormativo.giurisdizione,
+      tipo: attoNormativo.tipo,
       stato: attoNormativo.stato,
       tuttiISettori: attoNormativo.tuttiISettori,
     })

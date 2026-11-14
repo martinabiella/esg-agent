@@ -11,10 +11,14 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import { TIPI_ATTO } from "../lib/tipi-atto";
 
 // Vocabolario: vedi GLOSSARY.md
 
 export const giurisdizione = pgEnum("giurisdizione", ["ue", "italia"]);
+
+// Elenco e coerenza con la Giurisdizione: src/lib/tipi-atto.ts
+export const tipoAtto = pgEnum("tipo_atto", TIPI_ATTO);
 
 export const stato = pgEnum("stato", [
   "proposta",
@@ -54,6 +58,7 @@ export const attoNormativo = pgTable("atto_normativo", {
   // CELEX, numero COM, numero D.Lgs./DDL: quando esiste
   identificativoUfficiale: text("identificativo_ufficiale").unique(),
   giurisdizione: giurisdizione("giurisdizione").notNull(),
+  tipo: tipoAtto("tipo").notNull(),
   stato: stato("stato").notNull(),
   summary: text("summary").notNull().default(""),
   urlTesto: text("url_testo"),
@@ -128,6 +133,7 @@ export const cliente = pgTable("cliente", {
   dipendenti: integer("dipendenti"),
   fatturato: numeric("fatturato"),
   annoRiferimento: integer("anno_riferimento"),
+  // Codici ISO 3166-1 alpha-2 (validati da src/lib/paesi.ts)
   paesi: text("paesi").array(),
   note: text("note"),
   creatoIl: timestamp("creato_il").notNull().defaultNow(),
