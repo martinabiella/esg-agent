@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { Caricamento } from "@/app/caricamento";
 import { elencoSettori } from "@/db/settori";
 
 export const metadata = { title: "Settori · Monitoraggio ESG" };
@@ -8,7 +9,7 @@ export default function SettoriPage() {
   return (
     <div>
       <h1 className="text-2xl font-semibold">Settori</h1>
-      <Suspense fallback={<p className="mt-4 text-sm opacity-70">Caricamento…</p>}>
+      <Suspense fallback={<Caricamento />}>
         <Elenco />
       </Suspense>
     </div>

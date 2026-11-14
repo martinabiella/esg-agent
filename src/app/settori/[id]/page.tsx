@@ -1,7 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { attiDelSettore, trovaSettore } from "@/db/settori";
+import { Caricamento } from "@/app/caricamento";
+import { attiDelSettore } from "@/db/atti";
+import { trovaSettore } from "@/db/settori";
 import { etichettaGiurisdizione, etichettaStato } from "@/lib/etichette";
 
 export default function SchedaSettorePage(props: PageProps<"/settori/[id]">) {
@@ -10,7 +12,7 @@ export default function SchedaSettorePage(props: PageProps<"/settori/[id]">) {
       <Link href="/settori" className="text-sm hover:underline">
         ← Tutti i Settori
       </Link>
-      <Suspense fallback={<p className="mt-4 text-sm opacity-70">Caricamento…</p>}>
+      <Suspense fallback={<Caricamento />}>
         <Scheda params={props.params} />
       </Suspense>
     </div>
@@ -20,7 +22,8 @@ export default function SchedaSettorePage(props: PageProps<"/settori/[id]">) {
 async function Scheda({ params }: { params: Promise<{ id: string }> }) {
   const { id: idGrezzo } = await params;
   const id = Number(idGrezzo);
-  if (!Number.isInteger(id)) notFound();
+  // Oltre INT4_MAX Postgres darebbe errore: è comunque un id inesistente.
+  if (!Number.isInteger(id) || id < 1 || id > 2147483647) notFound();
   const settore = await trovaSettore(id);
   if (!settore) notFound();
   const atti = await attiDelSettore(id);
