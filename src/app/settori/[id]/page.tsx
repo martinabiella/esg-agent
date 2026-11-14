@@ -4,7 +4,11 @@ import { notFound } from "next/navigation";
 import { Caricamento } from "@/app/caricamento";
 import { attiDelSettore } from "@/db/atti";
 import { trovaSettore } from "@/db/settori";
-import { etichettaGiurisdizione, etichettaStato } from "@/lib/etichette";
+import {
+  etichettaGiurisdizione,
+  etichettaStato,
+  etichettaTipoAtto,
+} from "@/lib/etichette";
 
 export default function SchedaSettorePage(props: PageProps<"/settori/[id]">) {
   return (
@@ -43,6 +47,7 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
               <span className="font-medium">{a.titolo}</span>
               <p className="mt-1 text-sm opacity-70">
                 {etichettaGiurisdizione[a.giurisdizione]} ·{" "}
+                {etichettaTipoAtto[a.tipo]} ·{" "}
                 {etichettaStato[a.stato]}
                 {a.tuttiISettori && " · tutti i Settori"}
               </p>
