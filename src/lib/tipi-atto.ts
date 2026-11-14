@@ -15,6 +15,10 @@ export const TIPI_ATTO = [...TIPI_UE, ...TIPI_ITALIA, "altro"] as const;
 export type TipoAtto = (typeof TIPI_ATTO)[number];
 export type GiurisdizioneAtto = "ue" | "italia";
 
+export function eTipoAtto(valore: string): valore is TipoAtto {
+  return (TIPI_ATTO as readonly string[]).includes(valore);
+}
+
 export function tipiAmmessi(giurisdizione: GiurisdizioneAtto): TipoAtto[] {
   return [...(giurisdizione === "ue" ? TIPI_UE : TIPI_ITALIA), "altro"];
 }
@@ -33,13 +37,13 @@ export function validaTipoAtto(
   giurisdizione: GiurisdizioneAtto,
 ): EsitoValidazione {
   if (!tipo) return { ok: false, errore: "Il Tipo di atto è obbligatorio." };
-  if (!(TIPI_ATTO as readonly string[]).includes(tipo)) {
+  if (!eTipoAtto(tipo)) {
     return { ok: false, errore: `Tipo di atto sconosciuto: ${tipo}.` };
   }
-  if (!tipoAmmesso(tipo as TipoAtto, giurisdizione)) {
+  if (!tipoAmmesso(tipo, giurisdizione)) {
     return {
       ok: false,
-      errore: `${etichettaTipoAtto[tipo as TipoAtto]} non è un Tipo valido per la Giurisdizione ${etichettaGiurisdizione[giurisdizione]}.`,
+      errore: `${etichettaTipoAtto[tipo]} non è un Tipo valido per la Giurisdizione ${etichettaGiurisdizione[giurisdizione]}.`,
     };
   }
   return { ok: true };

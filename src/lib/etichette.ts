@@ -1,5 +1,6 @@
 import type { giurisdizione, stato } from "@/db/schema";
 import type { TipoAtto } from "./tipi-atto";
+
 export const etichettaGiurisdizione: Record<
   (typeof giurisdizione.enumValues)[number],
   string
