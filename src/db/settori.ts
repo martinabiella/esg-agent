@@ -30,7 +30,7 @@ export async function attiDelSettore(settoreId: number) {
           eq(attoNormativo.tuttiISettori, true),
           exists(
             db
-              .select({ x: attoSettore.attoId })
+              .select({ attoId: attoSettore.attoId })
               .from(attoSettore)
               .where(
                 and(

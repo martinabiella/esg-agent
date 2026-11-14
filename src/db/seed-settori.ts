@@ -26,6 +26,7 @@ const SETTORI: [string, string][] = [
 ];
 
 async function main() {
+  // Import dinamico: dotenv deve caricare DATABASE_URL prima del modulo db.
   const { db } = await import("./index");
   const { settore } = await import("./schema");
   // Non sovrascrive: le modifiche fatte dall'utente restano.
@@ -37,4 +38,9 @@ async function main() {
   console.log(`Settori inseriti: ${inseriti.length} su ${SETTORI.length}`);
 }
 
-main();
+main()
+  .then(() => process.exit(0))
+  .catch((errore) => {
+    console.error(errore);
+    process.exit(1);
+  });

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { attiDelSettore, trovaSettore } from "@/db/settori";
+import { etichettaGiurisdizione, etichettaStato } from "@/lib/etichette";
 
 export default function SchedaSettorePage(props: PageProps<"/settori/[id]">) {
   return (
@@ -38,8 +39,8 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
             <li key={a.id} className="py-3">
               <span className="font-medium">{a.titolo}</span>
               <p className="mt-1 text-sm opacity-70">
-                {a.giurisdizione === "ue" ? "UE" : "Italia"} ·{" "}
-                {a.stato.replace("_", " ")}
+                {etichettaGiurisdizione[a.giurisdizione]} ·{" "}
+                {etichettaStato[a.stato]}
                 {a.tuttiISettori && " · tutti i Settori"}
               </p>
             </li>
