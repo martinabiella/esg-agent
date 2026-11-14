@@ -8,6 +8,10 @@ Strumento per un team di consulenza che monitora la normativa di sostenibilità 
 Un singolo atto legislativo o regolamentare di sostenibilità (proposta, direttiva, regolamento, decreto, ecc.) seguito lungo tutto il suo ciclo di vita. È l'entità monitorata.
 _Avoid_: Normativa, norma, legge, proposta (una proposta è un Atto in un certo Stato)
 
+**Tipo di atto**:
+La forma giuridica di un Atto. Per l'UE: *regolamento* (direttamente applicabile in tutti gli Stati membri), *direttiva* (vincola gli Stati a recepirla: ciò che si applica alle aziende è l'Atto italiano di recepimento, che può discostarsi dalla direttiva) e *decisione*. Per l'Italia: legge, decreto legislativo, decreto, disegno di legge. Una proposta non è un Tipo ma uno Stato (una "proposta di direttiva" è una direttiva in Stato *proposta*).
+_Avoid_: Natura, categoria
+
 **Stato**:
 La fase del ciclo di vita in cui si trova un Atto normativo (es. proposta, in discussione, approvato, in vigore, modificato, abrogato).
 _Avoid_: Status, fase
@@ -33,12 +37,16 @@ Un ambito di attività economica con la descrizione delle attività che include.
 _Avoid_: Industria, comparto
 
 **Cliente**:
-Un'azienda seguita dal team. Dati obbligatori: ragione sociale, attività specifica, Settore. Dipendenti, fatturato, localizzazione e altri dati sono facoltativi.
+Un'azienda seguita dal team. Dati obbligatori: ragione sociale, attività specifica, Settore. Dipendenti, fatturato (di un solo anno di riferimento), paesi (scelti da un elenco prefissato) e altri dati sono facoltativi.
 _Avoid_: Azienda, società, account
 
 **Applicabilità**:
-L'esito del confronto tra i Criteri di applicabilità di un Atto e i dati di un Cliente: applicabile, non applicabile o da verificare (quando mancano dati o il match è incerto). È provvisoria finché i Criteri dell'Atto sono solo generati dall'agente.
+L'esito del confronto tra i Criteri di applicabilità di un Atto e i dati di un Cliente: applicabile, non applicabile o da verificare (quando mancano dati o il match è incerto). Un dato mancante non è né rispettato né violato: l'esito è certo solo se sarebbe lo stesso con qualsiasi valore possibile del dato, altrimenti è da verificare. Il testo libero dei Criteri non è calcolabile: se presente, l'esito non può essere "non applicabile" in automatico. Lo Stato dell'Atto non entra nel calcolo: viene mostrato accanto all'esito. È provvisoria finché i Criteri dell'Atto sono solo generati dall'agente.
 _Avoid_: Impatto, rilevanza
+
+**Soglia**:
+Una condizione strutturata dei Criteri di applicabilità su un dato del Cliente (per esempio un minimo di dipendenti). Un Atto può avere più Soglie e indica quante devono essere rispettate (di default tutte). Le Soglie non esauriscono i Criteri: ciò che non è strutturabile va nel testo libero.
+_Avoid_: Requisito, limite
 
 **Override**:
 Decisione manuale, con motivazione, che sostituisce l'Applicabilità calcolata per una specifica coppia Cliente–Atto.
