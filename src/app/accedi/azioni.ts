@@ -14,15 +14,14 @@ export async function accedi(
   const password = String(formData.get("password") ?? "");
   if (!email || !password) return { errore: "Inserisci email e password." };
 
-  let riuscito = false;
+  let errore;
   try {
-    const { error } = await auth.signIn.email({ email, password });
-    riuscito = !error;
+    ({ error: errore } = await auth.signIn.email({ email, password }));
   } catch {
-    riuscito = false;
+    return { errore: "Servizio di accesso non disponibile. Riprova tra poco." };
   }
   // Messaggio unico: non rivela se l'email esiste.
-  if (!riuscito) return { errore: "Email o password non corretti." };
+  if (errore) return { errore: "Email o password non corretti." };
 
   redirect(percorsoInterno(formData.get("dopo")));
 }
