@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Caricamento } from "@/app/caricamento";
 import { elencoAtti, elencoTemi } from "@/db/atti";
 import { elencoSettori } from "@/db/settori";
 import { stato } from "@/db/schema";
 import { filtriAttiDaParams } from "@/lib/filtri-atti";
-import { etichettaGiurisdizione, etichettaStato } from "@/lib/etichette";
+import { etichettaStato } from "@/lib/etichette";
+import { TabellaNormative } from "./tabella-normative";
 
 export const metadata = { title: "Normative · Monitoraggio ESG" };
 
@@ -85,30 +85,7 @@ async function Contenuto({
         )}
       </form>
 
-      {atti.length === 0 ? (
-        <p className="mt-6 text-sm text-muted-foreground">
-          {filtriAttivi
-            ? "Nessun Atto normativo corrisponde ai filtri scelti."
-            : "Nessun Atto normativo presente."}
-        </p>
-      ) : (
-        <ul className="mt-6 divide-y border-y">
-          {atti.map((a) => (
-            <li key={a.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
-              <div>
-                <Link href={`/normative/${a.id}`} className="font-medium hover:underline">
-                  {a.titolo}
-                </Link>
-                <p className="mt-1 text-sm">
-                <Badge variant="secondary">{etichettaGiurisdizione[a.giurisdizione]}</Badge>{" "}
-                  <Badge>{etichettaStato[a.stato]}</Badge>
-                </p>
-              </div>
-              <Button variant="outline" size="sm" render={<Link href={`/normative/${a.id}/modifica`} />}>Modifica</Button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <TabellaNormative atti={atti} filtriAttivi={filtriAttivi} />
     </>
   );
 }
