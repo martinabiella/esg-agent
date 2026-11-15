@@ -34,3 +34,19 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Accesso (Neon Auth)
+
+Tutta l'app è dietro login (Neon Auth, Managed Better Auth, email e password). Non c'è registrazione pubblica: gli utenti si creano dal pannello Neon (progetto `esg-agent` → Auth → Users). Il recupero password si gestisce dal pannello.
+
+Variabili d'ambiente (in `.env.local`, mai nel repository):
+
+| Variabile | Descrizione |
+| --- | --- |
+| `DATABASE_URL` | Connessione Postgres su Neon |
+| `NEON_AUTH_BASE_URL` | URL di Neon Auth del branch (pannello Neon → Auth → Configuration) |
+| `NEON_AUTH_COOKIE_SECRET` | Segreto per i cookie di sessione, almeno 32 caratteri: `openssl rand -base64 32` |
+
+Per le scritture (azioni server e rotte API) usare `utenteRichiesto()` da `@/lib/auth`: restituisce l'utente corrente o lancia `NonAutenticatoError`.
+
+Il proxy (`src/proxy.ts`) reindirizza a `/accedi` chi non è autenticato, ma non basta: ogni scrittura deve verificare la sessione lato server.
