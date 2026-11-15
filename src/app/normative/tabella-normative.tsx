@@ -27,6 +27,7 @@ export function TabellaNormative({
           <TableRow>
             <TableHead>Titolo</TableHead>
             <TableHead>Giurisdizione</TableHead>
+            <TableHead>Settori</TableHead>
             <TableHead>Temi</TableHead>
             <TableHead>Stato più recente</TableHead>
           </TableRow>
@@ -34,7 +35,7 @@ export function TabellaNormative({
         <TableBody>
           {atti.length === 0 && (
             <TableRow>
-              <TableCell colSpan={4} className="text-muted-foreground">
+              <TableCell colSpan={5} className="text-muted-foreground">
                 {filtriAttivi
                   ? "Nessun Atto normativo corrisponde ai filtri scelti."
                   : "Nessun Atto normativo presente."}
@@ -52,6 +53,21 @@ export function TabellaNormative({
                 <Badge variant="secondary">
                   {etichettaGiurisdizione[atto.giurisdizione]}
                 </Badge>
+              </TableCell>
+              <TableCell>
+                {atto.tuttiISettori ? (
+                  <Badge variant="outline">Tutti i Settori</Badge>
+                ) : atto.settori.length === 0 ? (
+                  <span className="text-muted-foreground">—</span>
+                ) : (
+                  <ul className="flex flex-wrap gap-1">
+                    {atto.settori.map((settore) => (
+                      <li key={settore.id}>
+                        <Badge variant="outline">{settore.nome}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </TableCell>
               <TableCell>
                 {atto.temi.length === 0 ? (

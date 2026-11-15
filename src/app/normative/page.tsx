@@ -1,6 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Caricamento } from "@/app/caricamento";
 import { elencoAtti, elencoTemi } from "@/db/atti";
 import { elencoSettori } from "@/db/settori";
@@ -37,9 +44,6 @@ async function EsitoDaIndirizzo({
   return <Esito esito={(await searchParams).esito} />;
 }
 
-const selectClasse =
-  "h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
-
 async function Contenuto({
   searchParams,
 }: {
@@ -58,36 +62,48 @@ async function Contenuto({
       <form method="get" className="mt-4 flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-sm">
           Settore
-          <select name="settore" defaultValue={filtri.settoreId ?? ""} className={selectClasse}>
-            <option value="">Tutti</option>
+          <Select name="settore" defaultValue={filtri.settoreId?.toString()}>
+            <SelectTrigger className="min-w-48">
+              <SelectValue placeholder="Tutti" />
+            </SelectTrigger>
+            <SelectContent>
             {settori.map((s) => (
-              <option key={s.id} value={s.id}>
+              <SelectItem key={s.id} value={s.id.toString()}>
                 {s.nome}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+            </SelectContent>
+          </Select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
           Tema
-          <select name="tema" defaultValue={filtri.temaId ?? ""} className={selectClasse}>
-            <option value="">Tutti</option>
+          <Select name="tema" defaultValue={filtri.temaId?.toString()}>
+            <SelectTrigger className="min-w-48">
+              <SelectValue placeholder="Tutti" />
+            </SelectTrigger>
+            <SelectContent>
             {temi.map((t) => (
-              <option key={t.id} value={t.id}>
+              <SelectItem key={t.id} value={t.id.toString()}>
                 {t.nome}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+            </SelectContent>
+          </Select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
           Stato
-          <select name="stato" defaultValue={filtri.stato ?? ""} className={selectClasse}>
-            <option value="">Tutti (esclusi gli abrogati)</option>
+          <Select name="stato" defaultValue={filtri.stato}>
+            <SelectTrigger className="min-w-56">
+              <SelectValue placeholder="Tutti (esclusi gli abrogati)" />
+            </SelectTrigger>
+            <SelectContent>
             {stato.enumValues.map((s) => (
-              <option key={s} value={s}>
+              <SelectItem key={s} value={s}>
                 {etichettaStato[s]}
-              </option>
+              </SelectItem>
             ))}
-          </select>
+            </SelectContent>
+          </Select>
         </label>
         <Button type="submit">Filtra</Button>
         {filtriAttivi && (

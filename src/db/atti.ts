@@ -59,11 +59,17 @@ export async function elencoAtti(filtri: FiltriAtti) {
     .orderBy(asc(attoNormativo.titolo));
 
   if (atti.length === 0) {
-    return atti.map((atto) => ({ ...atto, temi: [], statoRecente: atto.stato }));
+    return atti.map((atto) => ({ ...atto, settori: [], temi: [], statoRecente: atto.stato }));
   }
 
   const ids = atti.map((atto) => atto.id);
-  const [temi, storico] = await Promise.all([
+  const [settori, temi, storico] = await Promise.all([
+    db
+      .select({ attoId: attoSettore.attoId, id: settore.id, nome: settore.nome })
+      .from(attoSettore)
+      .innerJoin(settore, eq(settore.id, attoSettore.settoreId))
+      .where(inArray(attoSettore.attoId, ids))
+      .orderBy(asc(settore.nome)),
     db
       .select({ attoId: attoTema.attoId, id: tema.id, nome: tema.nome })
       .from(attoTema)
@@ -76,6 +82,13 @@ export async function elencoAtti(filtri: FiltriAtti) {
       .where(inArray(statoStorico.attoId, ids))
       .orderBy(desc(statoStorico.data), desc(statoStorico.id)),
   ]);
+
+  const settoriPerAtto = new Map<number, { id: number; nome: string }[]>();
+  for (const s of settori) {
+    const elenco = settoriPerAtto.get(s.attoId) ?? [];
+    elenco.push({ id: s.id, nome: s.nome });
+    settoriPerAtto.set(s.attoId, elenco);
+  }
 
   const temiPerAtto = new Map<number, { id: number; nome: string }[]>();
   for (const t of temi) {
@@ -93,6 +106,7 @@ export async function elencoAtti(filtri: FiltriAtti) {
 
   return atti.map((atto) => ({
     ...atto,
+    settori: settoriPerAtto.get(atto.id) ?? [],
     temi: temiPerAtto.get(atto.id) ?? [],
     statoRecente: statoRecentePerAtto.get(atto.id) ?? atto.stato,
   }));

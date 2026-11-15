@@ -7,15 +7,27 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { SogliaModulo, ValoriModuloAtto } from "@/lib/atto";
 import { etichettaStato, etichettaTipoAtto } from "@/lib/etichette";
 import { TIPI_ATTO, tipiAmmessi } from "@/lib/tipi-atto";
 import { elencoPaesi } from "@/lib/paesi";
+import {
+  SelezioneMultipla,
+  SelezioneSingola,
+  type Voce as VoceSelezione,
+} from "@/app/clienti/selezione-multipla";
 import type { StatoModuloAtto } from "./azioni";
 
 type Azione = (stato: StatoModuloAtto, formData: FormData) => Promise<StatoModuloAtto>;
-type Voce = { id: number; nome: string };
+type VoceAtto = { id: number; nome: string };
 type AttoVoce = { id: number; titolo: string; giurisdizione: "ue" | "italia" };
 
 const stati = ["proposta", "in_discussione", "approvato", "in_vigore", "modificato", "abrogato"] as const;
@@ -57,11 +69,24 @@ function Soglie({
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex min-w-40 flex-1 flex-col gap-1 text-sm">
               Campo
-              <select className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm" value={soglia.campo} onChange={(e) => modifica(indice, { campo: e.target.value as SogliaModulo["campo"], paesi: [] })}>
-                <option value="dipendenti">Dipendenti</option>
-                <option value="fatturato">Fatturato (€)</option>
-                <option value="paesi">Paesi</option>
-              </select>
+              <Select
+                value={soglia.campo}
+                onValueChange={(campo) =>
+                  modifica(indice, {
+                    campo: campo as SogliaModulo["campo"],
+                    paesi: [],
+                  })
+                }
+              >
+                <SelectTrigger className="h-9 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dipendenti">Dipendenti</SelectItem>
+                  <SelectItem value="fatturato">Fatturato (€)</SelectItem>
+                  <SelectItem value="paesi">Paesi</SelectItem>
+                </SelectContent>
+              </Select>
             </label>
             {soglia.campo !== "paesi" ? (
               <>
@@ -77,9 +102,14 @@ function Soglie({
             ) : (
               <label className="min-w-52 flex-1 text-sm">
                 Paesi
-                <select multiple className="mt-1 h-24 w-full rounded-lg border border-input bg-transparent px-2 text-sm" value={soglia.paesi} onChange={(e) => modifica(indice, { paesi: Array.from(e.target.selectedOptions, (o) => o.value) })}>
-                  {opzioniPaesi.map((paese) => <option key={paese.value} value={paese.value}>{paese.label}</option>)}
-                </select>
+                <SelezioneMultipla
+                  id={`paesi-${indice}`}
+                  voci={opzioniPaesi}
+                  iniziali={soglia.paesi}
+                  segnaposto="Cerca un paese…"
+                  vuoto="Nessun paese trovato."
+                  onChange={(paesi) => modifica(indice, { paesi })}
+                />
               </label>
             )}
             <Button type="button" variant="ghost" size="sm" onClick={() => onChange(valori.filter((_, i) => i !== indice))}>Rimuovi</Button>
@@ -105,31 +135,48 @@ function Relazioni({ valori, atti, onChange, errore }: { valori: ValoriModuloAtt
         <div key={indice} className="flex flex-wrap items-end gap-2 rounded-lg border p-3">
           <label className="flex min-w-36 flex-1 flex-col gap-1 text-sm">
             Tipo
-            <select className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm" value={relazione.tipo} onChange={(e) => onChange(valori.map((r, i) => i === indice ? { ...r, tipo: e.target.value as typeof r.tipo } : r))}>
-              <option value="recepisce">Recepisce</option>
-              <option value="modifica">Modifica</option>
-              <option value="sostituisce">Sostituisce</option>
-            </select>
+            <Select
+              value={relazione.tipo}
+              onValueChange={(tipo) =>
+                onChange(
+                  valori.map((r, i) =>
+                    i === indice ? { ...r, tipo: tipo as typeof r.tipo } : r,
+                  ),
+                )
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recepisce">Recepisce</SelectItem>
+                <SelectItem value="modifica">Modifica</SelectItem>
+                <SelectItem value="sostituisce">Sostituisce</SelectItem>
+              </SelectContent>
+            </Select>
           </label>
           <label className="min-w-64 flex-[3] text-sm">
             Atto collegato (ricerca per titolo)
-            <Input list="atti-relazioni" className="mt-1" value={atti.find((a) => String(a.id) === relazione.attoId)?.titolo ?? ""} onChange={(e) => {
-              const trovato = atti.find((a) => a.titolo === e.target.value);
-              onChange(valori.map((r, i) => i === indice ? { ...r, attoId: trovato ? String(trovato.id) : "" } : r));
-            }} placeholder="Cerca per titolo…" />
+            <SelezioneSingola
+              id={`atto-relazione-${indice}`}
+              voci={atti.map((atto): VoceSelezione => ({ value: String(atto.id), label: atto.titolo }))}
+              valore={relazione.attoId}
+              segnaposto="Cerca per titolo…"
+              vuoto="Nessun Atto trovato."
+              onChange={(attoId) =>
+                onChange(valori.map((r, i) => (i === indice ? { ...r, attoId } : r)))
+              }
+            />
           </label>
           <Button type="button" variant="ghost" size="sm" onClick={() => onChange(valori.filter((_, i) => i !== indice))}>Rimuovi</Button>
         </div>
       ))}
-      <datalist id="atti-relazioni">
-        {atti.map((atto) => <option key={atto.id} value={atto.titolo}>{atto.giurisdizione === "ue" ? "UE" : "Italia"}</option>)}
-      </datalist>
       {errore && <p id="errore-relazioni" role="alert" className="text-sm text-destructive">{errore}</p>}
     </div>
   );
 }
 
-export function FormAtto({ azione, id, iniziali, settori, temi, atti, etichettaInvio, onAnnulla, onSalvato }: { azione: Azione; id?: number; iniziali: ValoriModuloAtto; settori: Voce[]; temi: Voce[]; atti: AttoVoce[]; etichettaInvio: string; onAnnulla?: () => void; onSalvato?: (id: number, esito: "creato" | "modificato") => void }) {
+export function FormAtto({ azione, id, iniziali, settori, temi, atti, etichettaInvio, onAnnulla, onSalvato }: { azione: Azione; id?: number; iniziali: ValoriModuloAtto; settori: VoceAtto[]; temi: VoceAtto[]; atti: AttoVoce[]; etichettaInvio: string; onAnnulla?: () => void; onSalvato?: (id: number, esito: "creato" | "modificato") => void }) {
   const router = useRouter();
   const [stato, esegui, inCorso] = useActionState(azione, undefined);
   const valori = stato?.valori ?? iniziali;
@@ -160,23 +207,50 @@ export function FormAtto({ azione, id, iniziali, settori, temi, atti, etichettaI
           <Input id="identificativoUfficiale" name="identificativoUfficiale" defaultValue={valori.identificativoUfficiale} aria-invalid={!!errore("identificativoUfficiale")} aria-describedby={descrizione("identificativoUfficiale")} />
         </Campo>
         <Campo nome="giurisdizione" etichetta="Giurisdizione *" errore={errore("giurisdizione")}>
-          <select id="giurisdizione" name="giurisdizione" value={giurisdizione} onChange={(e) => {
-            const nuova = e.target.value;
-            setGiurisdizione(nuova);
-            if ((nuova === "ue" || nuova === "italia") && !tipiAmmessi(nuova).some((valore) => valore === tipo)) setTipo("");
-          }} className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm" required>
-            <option value="">Scegli…</option><option value="ue">UE</option><option value="italia">Italia</option>
-          </select>
+          <Select
+            id="giurisdizione"
+            name="giurisdizione"
+            value={giurisdizione || null}
+            onValueChange={(nuova) => {
+              const valore = nuova ?? "";
+              setGiurisdizione(valore);
+              if (
+                (valore === "ue" || valore === "italia") &&
+                !tipiAmmessi(valore).some((opzione) => opzione === tipo)
+              ) {
+                setTipo("");
+              }
+            }}
+            required
+          >
+            <SelectTrigger id="giurisdizione" className="h-9 w-full">
+              <SelectValue placeholder="Scegli…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ue">UE</SelectItem>
+              <SelectItem value="italia">Italia</SelectItem>
+            </SelectContent>
+          </Select>
         </Campo>
         <Campo nome="tipo" etichetta="Tipo di atto *" errore={errore("tipo")}>
-          <select id="tipo" name="tipo" value={tipo} onChange={(e) => setTipo(e.target.value)} className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm" required>
-            <option value="">Scegli…</option>{tipi.map((tipo) => <option key={tipo} value={tipo}>{etichettaTipoAtto[tipo]}</option>)}
-          </select>
+          <Select id="tipo" name="tipo" value={tipo || null} onValueChange={(valore) => setTipo(valore ?? "")} required>
+            <SelectTrigger id="tipo" className="h-9 w-full">
+              <SelectValue placeholder="Scegli…" />
+            </SelectTrigger>
+            <SelectContent>
+              {tipi.map((tipo) => <SelectItem key={tipo} value={tipo}>{etichettaTipoAtto[tipo]}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </Campo>
         <Campo nome="stato" etichetta="Stato *" errore={errore("stato")}>
-          <select id="stato" name="stato" defaultValue={valori.stato} className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm" required>
-            <option value="">Scegli…</option>{stati.map((stato) => <option key={stato} value={stato}>{etichettaStato[stato]}</option>)}
-          </select>
+          <Select id="stato" name="stato" defaultValue={valori.stato || undefined} required>
+            <SelectTrigger id="stato" className="h-9 w-full">
+              <SelectValue placeholder="Scegli…" />
+            </SelectTrigger>
+            <SelectContent>
+              {stati.map((stato) => <SelectItem key={stato} value={stato}>{etichettaStato[stato]}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </Campo>
         <Campo nome="dataStato" etichetta="Data dello Stato *" errore={errore("dataStato")}>
           <Input id="dataStato" name="dataStato" type="date" defaultValue={valori.dataStato} required aria-invalid={!!errore("dataStato")} />
@@ -189,18 +263,33 @@ export function FormAtto({ azione, id, iniziali, settori, temi, atti, etichettaI
       <div className="flex flex-col gap-3">
         <Label>Settori</Label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="tuttiISettori" checked={tuttiISettori} onChange={(e) => setTuttiISettori(e.target.checked)} /> Tutti i Settori</label>
-        <select multiple name="settori" defaultValue={valori.settori} disabled={tuttiISettori} aria-invalid={!!errore("settori")} aria-describedby={descrizione("settori")} className="h-32 rounded-lg border border-input bg-transparent p-2 text-sm disabled:opacity-50">
-          {settori.map((settore) => <option key={settore.id} value={settore.id}>{settore.nome}</option>)}
-        </select>
-        <p className="text-xs text-muted-foreground">Facoltativo. Tieni premuto Ctrl/⌘ per scegliere più Settori. La selezione è esclusiva rispetto a “Tutti i Settori”.</p>
+        <SelezioneMultipla
+          id="settori"
+          name="settori"
+          voci={settori.map((settore): VoceSelezione => ({ value: String(settore.id), label: settore.nome }))}
+          iniziali={valori.settori}
+          segnaposto="Cerca un Settore…"
+          vuoto="Nessun Settore trovato."
+          disabled={tuttiISettori}
+          nonValido={!!errore("settori")}
+          descrittoDa={descrizione("settori")}
+        />
+        <p className="text-xs text-muted-foreground">Facoltativo. Cerca e seleziona i Settori. La selezione è esclusiva rispetto a “Tutti i Settori”.</p>
         {errore("settori") && <p id="errore-settori" role="alert" className="text-sm text-destructive">{errore("settori")}</p>}
       </div>
 
       <div className="flex flex-col gap-3">
         <Label htmlFor="temi">Temi</Label>
-        <select id="temi" multiple name="temi" defaultValue={valori.temi} aria-invalid={!!errore("temi")} className="h-32 rounded-lg border border-input bg-transparent p-2 text-sm">
-          {temi.map((tema) => <option key={tema.id} value={tema.id}>{tema.nome}</option>)}
-        </select>
+        <SelezioneMultipla
+          id="temi"
+          name="temi"
+          voci={temi.map((tema): VoceSelezione => ({ value: String(tema.id), label: tema.nome }))}
+          iniziali={valori.temi}
+          segnaposto="Cerca un Tema…"
+          vuoto="Nessun Tema trovato."
+          nonValido={!!errore("temi")}
+          descrittoDa={descrizione("temi")}
+        />
         <Input id="nuovoTema" name="nuovoTema" defaultValue={valori.nuovoTema} placeholder="Oppure crea un nuovo Tema…" />
         {errore("temi") && <p role="alert" className="text-sm text-destructive">{errore("temi")}</p>}
       </div>
