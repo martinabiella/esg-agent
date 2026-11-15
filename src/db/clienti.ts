@@ -42,17 +42,3 @@ export async function elencoClienti(): Promise<ClienteConSettori[]> {
   ]);
   return aggiungiSettori(clienti, collegamenti);
 }
-
-export async function trovaCliente(id: number): Promise<ClienteConSettori | null> {
-  const [clienteTrovato] = await db.select().from(cliente).where(eq(cliente.id, id));
-  if (!clienteTrovato) return null;
-
-  const collegamenti = await db
-    .select({ id: settore.id, nome: settore.nome })
-    .from(clienteSettore)
-    .innerJoin(settore, eq(clienteSettore.settoreId, settore.id))
-    .where(eq(clienteSettore.clienteId, id))
-    .orderBy(asc(settore.nome));
-
-  return { ...clienteTrovato, settori: collegamenti };
-}
