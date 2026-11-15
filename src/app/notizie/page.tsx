@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Caricamento } from "@/app/caricamento";
-import { elencoNotizie, trovaNotizia } from "@/db/notizie";
+import { attiPerSelezione, elencoNotizie, trovaNotizia } from "@/db/notizie";
 import { notiziaIdDaParams } from "@/lib/notizia";
 import { TabellaNotizie } from "./tabella-notizie";
 
@@ -23,14 +23,11 @@ async function Contenuto({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const id = notiziaIdDaParams(await searchParams);
-  const [notizie, notiziaAperta] = await Promise.all([
+  const [notizie, notiziaAperta, atti] = await Promise.all([
     elencoNotizie(),
     id === null ? Promise.resolve(null) : trovaNotizia(id),
+    attiPerSelezione(),
   ]);
 
-  if (notizie.length === 0) {
-    return <p className="mt-4 text-sm text-muted-foreground">Nessuna Notizia presente.</p>;
-  }
-
-  return <TabellaNotizie notizie={notizie} notiziaAperta={notiziaAperta} />;
+  return <TabellaNotizie notizie={notizie} notiziaAperta={notiziaAperta} atti={atti} />;
 }
