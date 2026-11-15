@@ -3,6 +3,11 @@
 
 export type CampiSettore = { nome: string; descrizione: string };
 
+export type UsiSettore = { clienti: number; atti: number };
+
+// Esiti che la scheda o l'elenco mostrano dopo un salvataggio (?esito=…).
+export type EsitoSalvataggio = "creato" | "modificato" | "eliminato";
+
 export type EsitoSettore =
   | { ok: true; valori: CampiSettore }
   | {
@@ -30,10 +35,7 @@ export type EsitoEliminazione =
 
 // Clienti: l'eliminazione è bloccata. Atti: il collegamento cade a cascata,
 // quindi la conferma deve dire quanti ne sono toccati.
-export function valutaEliminazione(usi: {
-  clienti: number;
-  atti: number;
-}): EsitoEliminazione {
+export function valutaEliminazione(usi: UsiSettore): EsitoEliminazione {
   if (usi.clienti > 0) {
     const c = usi.clienti === 1 ? "1 Cliente" : `${usi.clienti} Clienti`;
     return {

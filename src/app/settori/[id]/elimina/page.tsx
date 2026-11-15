@@ -1,8 +1,8 @@
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
 import { Caricamento } from "@/app/caricamento";
-import { trovaSettore, usiSettore } from "@/db/settori";
-import { idSettore, valutaEliminazione } from "@/lib/settore";
+import { usiSettore } from "@/db/settori";
+import { valutaEliminazione } from "@/lib/settore";
+import { settoreDaParams } from "../../trova-da-params";
 import { FormElimina } from "./form-elimina";
 
 export default function EliminaSettorePage(props: PageProps<"/settori/[id]/elimina">) {
@@ -16,10 +16,8 @@ export default function EliminaSettorePage(props: PageProps<"/settori/[id]/elimi
 }
 
 async function Conferma({ params }: { params: Promise<{ id: string }> }) {
-  const id = idSettore((await params).id);
-  if (id === null) notFound();
-  const settore = await trovaSettore(id);
-  if (!settore) notFound();
+  const settore = await settoreDaParams(params);
+  const id = settore.id;
   const decisione = valutaEliminazione(await usiSettore(id));
   return (
     <>

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import type { CampiSettore } from "@/lib/settore";
 import type { StatoModulo } from "./azioni";
 
 type Azione = (stato: StatoModulo, formData: FormData) => Promise<StatoModulo>;
@@ -10,13 +11,13 @@ export function FormSettore({
   azione,
   id,
   iniziali,
-  annulla,
+  hrefAnnulla,
   etichettaInvio,
 }: {
   azione: Azione;
   id?: number;
-  iniziali: { nome: string; descrizione: string };
-  annulla: string;
+  iniziali: CampiSettore;
+  hrefAnnulla: string;
   etichettaInvio: string;
 }) {
   const [stato, esegui, inCorso] = useActionState(azione, undefined);
@@ -65,7 +66,7 @@ export function FormSettore({
         >
           {inCorso ? "Salvataggio…" : etichettaInvio}
         </button>
-        <Link href={annulla} className="text-sm hover:underline">
+        <Link href={hrefAnnulla} className="text-sm hover:underline">
           Annulla
         </Link>
       </div>

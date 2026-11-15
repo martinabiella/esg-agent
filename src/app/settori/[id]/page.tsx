@@ -1,10 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { Caricamento } from "@/app/caricamento";
 import { attiDelSettore } from "@/db/atti";
-import { trovaSettore } from "@/db/settori";
-import { idSettore } from "@/lib/settore";
+import { settoreDaParams } from "../trova-da-params";
 import { Esito } from "../esito";
 import {
   etichettaGiurisdizione,
@@ -32,10 +30,8 @@ async function Scheda({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const id = idSettore((await params).id);
-  if (id === null) notFound();
-  const settore = await trovaSettore(id);
-  if (!settore) notFound();
+  const settore = await settoreDaParams(params);
+  const id = settore.id;
   const atti = await attiDelSettore(id);
 
   return (

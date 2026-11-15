@@ -14,7 +14,7 @@ export default function NuovoSettorePage() {
       <FormSettore
         azione={creaSettoreAzione}
         iniziali={{ nome: "", descrizione: "" }}
-        annulla="/settori"
+        hrefAnnulla="/settori"
         etichettaInvio="Crea Settore"
       />
     </div>

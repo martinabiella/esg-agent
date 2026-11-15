@@ -10,13 +10,19 @@ import {
   eliminaSettore,
   usiSettore,
 } from "@/db/settori";
-import { idSettore, validaSettore, valutaEliminazione } from "@/lib/settore";
+import {
+  type CampiSettore,
+  type EsitoSalvataggio,
+  idSettore,
+  validaSettore,
+  valutaEliminazione,
+} from "@/lib/settore";
 
 export type StatoModulo =
   | {
       errori?: { nome?: string };
       errore?: string;
-      valori?: { nome: string; descrizione: string };
+      valori?: CampiSettore;
     }
   | undefined;
 
@@ -40,6 +46,11 @@ function leggiCampi(formData: FormData) {
   return validaSettore({ nome: testo("nome"), descrizione: testo("descrizione") });
 }
 
+// Il tipo garantisce che l'esito sia uno di quelli che esito.tsx sa mostrare.
+function vaiA(percorso: string, esito: EsitoSalvataggio): never {
+  redirect(`${percorso}?esito=${esito}`);
+}
+
 const NOME_DUPLICATO = "Esiste già un Settore con questo nome.";
 const NON_TROVATO = "Il Settore non esiste più.";
 
@@ -50,10 +61,10 @@ export async function creaSettoreAzione(
   await richiediSessione("/settori/nuovo");
   const esito = leggiCampi(formData);
   if (!esito.ok) return { errori: esito.errori, valori: esito.valori };
-  const r = await creaSettore(esito.valori);
-  if (!r.ok) return { errori: { nome: NOME_DUPLICATO }, valori: esito.valori };
+  const scrittura = await creaSettore(esito.valori);
+  if (!scrittura.ok) return { errori: { nome: NOME_DUPLICATO }, valori: esito.valori };
   revalidatePath("/settori");
-  redirect(`/settori/${r.id}?esito=creato`);
+  vaiA(`/settori/${scrittura.id}`, "creato");
 }
 
 export async function aggiornaSettoreAzione(
@@ -65,15 +76,15 @@ export async function aggiornaSettoreAzione(
   const esito = leggiCampi(formData);
   if (id === null) return { errore: NON_TROVATO, valori: esito.valori };
   if (!esito.ok) return { errori: esito.errori, valori: esito.valori };
-  const r = await aggiornaSettore(id, esito.valori);
-  if (!r.ok) {
-    return r.motivo === "nome_duplicato"
+  const scrittura = await aggiornaSettore(id, esito.valori);
+  if (!scrittura.ok) {
+    return scrittura.motivo === "nome_duplicato"
       ? { errori: { nome: NOME_DUPLICATO }, valori: esito.valori }
       : { errore: NON_TROVATO, valori: esito.valori };
   }
   revalidatePath("/settori");
   revalidatePath(`/settori/${id}`);
-  redirect(`/settori/${id}?esito=modificato`);
+  vaiA(`/settori/${id}`, "modificato");
 }
 
 export async function eliminaSettoreAzione(
@@ -85,15 +96,15 @@ export async function eliminaSettoreAzione(
   if (id === null) return { errore: NON_TROVATO };
   const decisione = valutaEliminazione(await usiSettore(id));
   if (!decisione.consentita) return { errore: decisione.messaggio };
-  const r = await eliminaSettore(id);
-  if (!r.ok) {
+  const scrittura = await eliminaSettore(id);
+  if (!scrittura.ok) {
     return {
       errore:
-        r.motivo === "in_uso"
+        scrittura.motivo === "in_uso"
           ? "Il Settore è appena stato assegnato a un Cliente: non può essere eliminato."
           : NON_TROVATO,
     };
   }
   revalidatePath("/settori");
-  redirect("/settori?esito=eliminato");
+  vaiA("/settori", "eliminato");
 }
