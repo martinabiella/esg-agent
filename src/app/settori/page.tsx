@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Caricamento } from "@/app/caricamento";
 import { elencoSettori } from "@/db/settori";
 import { Esito } from "./esito";
+import { TabellaSettori } from "./tabella-settori";
 
 export const metadata = { title: "Settori · Monitoraggio ESG" };
 
@@ -34,21 +35,5 @@ async function EsitoDaIndirizzo({
 
 async function Elenco() {
   const settori = await elencoSettori();
-  if (settori.length === 0) {
-    return <p className="mt-4 text-sm text-muted-foreground">Nessun Settore presente.</p>;
-  }
-  return (
-    <ul className="mt-4 divide-y border-y">
-      {settori.map((s) => (
-        <li key={s.id} className="py-3">
-          <Link href={`/settori/${s.id}`} className="font-medium hover:underline">
-            {s.nome}
-          </Link>
-          {s.descrizione && (
-            <p className="mt-1 text-sm text-muted-foreground">{s.descrizione}</p>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
+  return <TabellaSettori settori={settori} />;
 }
