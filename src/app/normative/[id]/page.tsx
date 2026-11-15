@@ -128,7 +128,7 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
         )}
       </Sezione>
 
-      <Sezione titolo="Clienti toccati">
+      <Sezione titolo="Clienti soggetti alla norma">
         <Suspense fallback={<Caricamento />}>
           <ClientiToccati atto={atto} />
         </Suspense>
