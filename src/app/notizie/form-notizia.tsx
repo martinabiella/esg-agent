@@ -111,13 +111,14 @@ export function FormNotizia({
           suggerimento="Indirizzo completo, che inizia con http:// o https://."
           extra={
             stato?.esistente && (
-              <button
+              <Button
                 type="button"
-                className="underline"
+                variant="link"
+                className="h-auto p-0"
                 onClick={() => onApriEsistente(stato.esistente!.id)}
               >
                 Apri «{stato.esistente.titolo}»
-              </button>
+              </Button>
             )
           }
         >
