@@ -66,6 +66,7 @@ function leggiInput(formData: FormData): InputAzione {
         "dataStato",
         "summary",
         "urlTesto",
+        "recepimentoEntro",
         "nuovoTema",
         "criteriTesto",
         "minimoSoglie",

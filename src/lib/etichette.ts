@@ -1,4 +1,5 @@
 import type { giurisdizione, provenienza, stato } from "@/db/schema";
+import type { Applicabilita } from "./applicabilita";
 import type { TipoAtto } from "./tipi-atto";
 
 export const etichettaGiurisdizione: Record<
@@ -39,4 +40,10 @@ export const etichettaProvenienza: Record<
   fonte_ufficiale: "Dalla fonte ufficiale",
   agente: "Generato dall'agente",
   persona: "Confermato da una persona",
+};
+
+export const etichettaApplicabilita: Record<Applicabilita, string> = {
+  applicabile: "Applicabile",
+  non_applicabile: "Non applicabile",
+  da_verificare: "Da verificare",
 };

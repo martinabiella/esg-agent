@@ -81,6 +81,8 @@ export const attoNormativo = pgTable("atto_normativo", {
   // true = si applica a tutti i Settori
   tuttiISettori: boolean("tutti_i_settori").notNull().default(false),
   nonRilevante: boolean("non_rilevante").notNull().default(false),
+  // Data entro cui gli Stati membri devono recepire (direttive UE): facoltativa
+  recepimentoEntro: date("recepimento_entro"),
   provenienzaContenuti: provenienza("provenienza_contenuti")
     .notNull()
     .default("persona"),
@@ -162,6 +164,26 @@ export const clienteSettore = pgTable(
       .references(() => settore.id, { onDelete: "restrict" }),
   },
   (t) => [primaryKey({ columns: [t.clienteId, t.settoreId] })],
+);
+
+export const esitoOverride = pgEnum("esito_override", ["applicabile", "non_applicabile"]);
+
+// Decisione manuale che sostituisce l'Applicabilità calcolata: una riga per coppia Cliente–Atto.
+export const overrideApplicabilita = pgTable(
+  "override_applicabilita",
+  {
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => cliente.id, { onDelete: "cascade" }),
+    attoId: integer("atto_id")
+      .notNull()
+      .references(() => attoNormativo.id, { onDelete: "cascade" }),
+    esito: esitoOverride("esito").notNull(),
+    motivazione: text("motivazione").notNull(),
+    autore: text("autore").notNull(),
+    creatoIl: timestamp("creato_il").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.clienteId, t.attoId] })],
 );
 
 export const notizia = pgTable("notizia", {

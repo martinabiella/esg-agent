@@ -11,6 +11,7 @@ import {
   etichettaTipoAtto,
 } from "@/lib/etichette";
 import { righeSoglie } from "@/lib/soglie";
+import { ClientiToccati } from "./clienti-toccati";
 import { EliminaAtto } from "../elimina-atto";
 
 export const metadata = { title: "Atto normativo · Monitoraggio ESG" };
@@ -73,6 +74,11 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
         {atto.nonRilevante && <Badge variant="destructive">Non rilevante</Badge>}
       </p>
       <p className="mt-2 text-sm text-muted-foreground">Contenuti: {provenienza}</p>
+      {atto.recepimentoEntro && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Recepimento entro il {dataIt(atto.recepimentoEntro)}
+        </p>
+      )}
       {atto.urlTesto && (
         <p className="mt-2 text-sm">
           <a href={atto.urlTesto} target="_blank" rel="noreferrer" className="underline">
@@ -125,6 +131,12 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
             ))}
           </ul>
         )}
+      </Sezione>
+
+      <Sezione titolo="Clienti soggetti alla norma">
+        <Suspense fallback={<Caricamento />}>
+          <ClientiToccati atto={atto} />
+        </Suspense>
       </Sezione>
 
       <Sezione titolo="Temi">
