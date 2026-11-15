@@ -53,7 +53,7 @@ export async function attiPerSelezione() {
 // ---- Scritture ----
 // Il driver neon-http non ha transazioni interattive: Notizia e collegamenti
 // agli Atti viaggiano in un'unica richiesta atomica (batch, o una sola istruzione).
-// La Provenienza di quanto salvato dal modulo è sempre "persona".
+// Le Notizie non hanno una Provenienza esposta: la colonna resta col suo valore di default.
 
 const VIOLAZIONE_UNICITA = "23505";
 const VIOLAZIONE_CHIAVE_ESTERNA = "23503";
@@ -97,9 +97,9 @@ export async function creaNotizia(valori: CampiNotizia): Promise<EsitoScritturaN
     // quindi atomica. Se un Atto non esiste la chiave esterna annulla tutto.
     const risultato = await db.execute<{ id: number }>(sql`
       WITH nuova AS (
-        INSERT INTO notizia (titolo, fonte, data, url, riassunto, provenienza_contenuti)
+        INSERT INTO notizia (titolo, fonte, data, url, riassunto)
         VALUES (${valori.titolo}, ${valori.fonte}, ${valori.data}::date, ${valori.url},
-                ${valori.riassunto}, 'persona')
+                ${valori.riassunto})
         RETURNING id
       ), collegamenti AS (
         INSERT INTO notizia_atto (notizia_id, atto_id)
@@ -119,7 +119,6 @@ export async function aggiornaNotizia(
 ): Promise<EsitoScritturaNotizia> {
   try {
     const [aggiornate] = await db.batch([
-      // La Provenienza resta quella già salvata: la modifica non la cambia.
       db
         .update(notizia)
         .set({

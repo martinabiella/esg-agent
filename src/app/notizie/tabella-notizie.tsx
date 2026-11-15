@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { NotiziaConAtti, NotiziaElenco } from "@/db/notizie";
-import { etichettaProvenienza, etichettaStato } from "@/lib/etichette";
+import { etichettaStato } from "@/lib/etichette";
 import type { ValoriNotizia } from "@/lib/notizia";
 import { aggiornaNotiziaAzione, creaNotiziaAzione, type EsitoOperazione } from "./azioni";
 import { EliminaNotizia } from "./elimina-notizia";
@@ -121,9 +121,6 @@ function DettaglioNotizia({ notizia }: { notizia: NotiziaConAtti }) {
             )}
           </dd>
         </div>
-        <Dato label="Provenienza">
-          {etichettaProvenienza[notizia.provenienzaContenuti]}
-        </Dato>
       </dl>
     </div>
   );
