@@ -40,3 +40,12 @@ export const etichettaProvenienza: Record<
   agente: "Generato dall'agente",
   persona: "Confermato da una persona",
 };
+
+export const etichettaApplicabilita: Record<
+  "applicabile" | "non_applicabile" | "da_verificare",
+  string
+> = {
+  applicabile: "Applicabile",
+  non_applicabile: "Non applicabile",
+  da_verificare: "Da verificare",
+};

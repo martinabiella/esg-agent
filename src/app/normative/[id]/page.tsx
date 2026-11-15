@@ -11,6 +11,7 @@ import {
   etichettaTipoAtto,
 } from "@/lib/etichette";
 import { righeSoglie } from "@/lib/soglie";
+import { ClientiToccati } from "./clienti-toccati";
 
 export const metadata = { title: "Atto normativo · Monitoraggio ESG" };
 
@@ -119,6 +120,12 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
             ))}
           </ul>
         )}
+      </Sezione>
+
+      <Sezione titolo="Clienti toccati">
+        <Suspense fallback={<Caricamento />}>
+          <ClientiToccati atto={atto} />
+        </Suspense>
       </Sezione>
 
       <Sezione titolo="Temi">
