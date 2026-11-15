@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -13,6 +14,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import type { Voce } from "@/app/clienti/selezione-multipla";
 import {
   Table,
   TableBody,
@@ -22,7 +24,41 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { NotiziaConAtti, NotiziaElenco } from "@/db/notizie";
-import { etichettaProvenienza } from "@/lib/etichette";
+import { etichettaStato } from "@/lib/etichette";
+import type { ValoriNotizia } from "@/lib/notizia";
+import { aggiornaNotiziaAzione, creaNotiziaAzione, type EsitoOperazione } from "./azioni";
+import { EliminaNotizia } from "./elimina-notizia";
+import { FormNotizia } from "./form-notizia";
+
+const MESSAGGI: Record<EsitoOperazione, string> = {
+  creata: "Notizia creata.",
+  modificata: "Modifiche salvate.",
+  eliminata: "Notizia eliminata.",
+};
+
+const MODULO_VUOTO: ValoriNotizia = {
+  titolo: "",
+  fonte: "",
+  url: "",
+  data: "",
+  riassunto: "",
+  atti: [],
+};
+
+function valoriDi(n: NotiziaConAtti): ValoriNotizia {
+  return {
+    titolo: n.titolo,
+    fonte: n.fonte,
+    url: n.url,
+    data: n.data ?? "",
+    riassunto: n.riassunto,
+    atti: n.atti.map((a) => String(a.id)),
+  };
+}
+
+// L'elenco e il dettaglio sono nell'URL (?notizia=<id>); il modulo di modifica e
+// quello di creazione sono stato locale del drawer.
+type Modalita = "dettaglio" | "modifica" | "nuovo";
 
 function dataIt(data: string | null) {
   if (!data) return "Data non indicata";
@@ -85,9 +121,6 @@ function DettaglioNotizia({ notizia }: { notizia: NotiziaConAtti }) {
             )}
           </dd>
         </div>
-        <Dato label="Provenienza">
-          {etichettaProvenienza[notizia.provenienzaContenuti]}
-        </Dato>
       </dl>
     </div>
   );
@@ -96,11 +129,28 @@ function DettaglioNotizia({ notizia }: { notizia: NotiziaConAtti }) {
 export function TabellaNotizie({
   notizie,
   notiziaAperta,
+  atti,
 }: {
   notizie: NotiziaElenco[];
   notiziaAperta: NotiziaConAtti | null;
+  atti: { id: number; titolo: string; stato: keyof typeof etichettaStato }[];
 }) {
   const router = useRouter();
+  const [modalita, setModalita] = useState<Modalita>("dettaglio");
+  const [esito, setEsito] = useState<EsitoOperazione | null>(null);
+  const vociAtti: Voce[] = atti.map((a) => ({
+    value: String(a.id),
+    label: `${a.titolo} (${etichettaStato[a.stato]})`,
+  }));
+  // "nuovo" vale solo finché nessuna Notizia è aperta nell'URL: dopo la
+  // creazione l'URL passa alla nuova Notizia e il drawer mostra il suo dettaglio.
+  const vista: Modalita | null = notiziaAperta
+    ? modalita === "modifica"
+      ? "modifica"
+      : "dettaglio"
+    : modalita === "nuovo"
+      ? "nuovo"
+      : null;
   const precedenteId = useRef<number | null>(notiziaAperta?.id ?? null);
 
   useEffect(() => {
@@ -116,15 +166,51 @@ export function TabellaNotizie({
   }, [notiziaAperta]);
 
   function apri(id: number) {
+    setEsito(null);
+    setModalita("dettaglio");
     router.push(`/notizie?notizia=${id}`, { scroll: false });
   }
 
   function chiudi() {
+    setModalita("dettaglio");
     router.replace("/notizie", { scroll: false });
   }
 
+  const dopoSalvataggio = useCallback(
+    (id: number, e: EsitoOperazione) => {
+      setEsito(e);
+      setModalita("dettaglio");
+      if (e === "creata") router.push(`/notizie?notizia=${id}`, { scroll: false });
+    },
+    [router],
+  );
+
+  const dopoEliminazione = useCallback(() => {
+    setEsito("eliminata");
+    setModalita("dettaglio");
+    router.replace("/notizie", { scroll: false });
+  }, [router]);
+
   return (
     <>
+      <div className="mt-4 flex items-center justify-between gap-4">
+        <div className="flex-1">
+          {esito === "eliminata" && vista === null && (
+            <Alert role="status" className="border-green-600 text-green-700">
+              <AlertDescription>{MESSAGGI.eliminata}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+        <Button
+          onClick={() => {
+            setEsito(null);
+            setModalita("nuovo");
+            if (notiziaAperta) router.replace("/notizie", { scroll: false });
+          }}
+        >
+          Nuova Notizia
+        </Button>
+      </div>
       <div className="mt-4 rounded-lg border">
         <Table>
           <TableHeader>
@@ -135,6 +221,13 @@ export function TabellaNotizie({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {notizie.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3} className="text-muted-foreground">
+                  Nessuna Notizia presente.
+                </TableCell>
+              </TableRow>
+            )}
             {notizie.map((notizia) => (
               <TableRow
                 key={notizia.id}
@@ -162,24 +255,86 @@ export function TabellaNotizie({
       </div>
 
       <Drawer
-        open={notiziaAperta !== null}
+        open={vista !== null}
         onOpenChange={(open) => {
           if (!open) chiudi();
         }}
         swipeDirection="right"
       >
-        {notiziaAperta && (
-          <DrawerContent id="notizia-drawer">
-            <DrawerHeader>
-              <DrawerTitle tabIndex={-1}>{notiziaAperta.titolo}</DrawerTitle>
-              <DrawerDescription>{notiziaAperta.fonte}</DrawerDescription>
-            </DrawerHeader>
-            <DettaglioNotizia notizia={notiziaAperta} />
-            <DrawerFooter>
-              <DrawerClose render={<Button variant="outline" />}>Chiudi</DrawerClose>
-            </DrawerFooter>
-          </DrawerContent>
-        )}
+        <DrawerContent id="notizia-drawer">
+          {vista === "nuovo" && (
+            <>
+              <DrawerHeader>
+                <DrawerTitle tabIndex={-1}>Nuova Notizia</DrawerTitle>
+                <DrawerDescription>I campi con * sono obbligatori.</DrawerDescription>
+              </DrawerHeader>
+              <FormNotizia
+                key="nuova"
+                azione={creaNotiziaAzione}
+                iniziali={MODULO_VUOTO}
+                atti={vociAtti}
+                etichettaInvio="Crea Notizia"
+                onAnnulla={chiudi}
+                onSalvato={dopoSalvataggio}
+                onApriEsistente={apri}
+              />
+            </>
+          )}
+          {vista === "modifica" && notiziaAperta && (
+            <>
+              <DrawerHeader>
+                <DrawerTitle tabIndex={-1}>Modifica Notizia</DrawerTitle>
+                <DrawerDescription>I campi con * sono obbligatori.</DrawerDescription>
+              </DrawerHeader>
+              <FormNotizia
+                key={`modifica-${notiziaAperta.id}`}
+                azione={aggiornaNotiziaAzione}
+                id={notiziaAperta.id}
+                iniziali={valoriDi(notiziaAperta)}
+                atti={vociAtti}
+                etichettaInvio="Salva modifiche"
+                onAnnulla={() => setModalita("dettaglio")}
+                onSalvato={dopoSalvataggio}
+                onApriEsistente={apri}
+              />
+            </>
+          )}
+          {vista === "dettaglio" && notiziaAperta && (
+            <>
+              <DrawerHeader>
+                <DrawerTitle tabIndex={-1}>{notiziaAperta.titolo}</DrawerTitle>
+                <DrawerDescription>{notiziaAperta.fonte}</DrawerDescription>
+              </DrawerHeader>
+              {esito && esito !== "eliminata" && (
+                <Alert role="status" className="mx-4 w-auto border-green-600 text-green-700">
+                  <AlertDescription>{MESSAGGI[esito]}</AlertDescription>
+                </Alert>
+              )}
+              <DettaglioNotizia notizia={notiziaAperta} />
+              <DrawerFooter>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => {
+                      setEsito(null);
+                      setModalita("modifica");
+                    }}
+                  >
+                    Modifica
+                  </Button>
+                  <EliminaNotizia
+                    key={notiziaAperta.id}
+                    id={notiziaAperta.id}
+                    titolo={notiziaAperta.titolo}
+                    onEliminata={dopoEliminazione}
+                  />
+                  <DrawerClose render={<Button variant="outline" className="ml-auto" />}>
+                    Chiudi
+                  </DrawerClose>
+                </div>
+              </DrawerFooter>
+            </>
+          )}
+        </DrawerContent>
       </Drawer>
     </>
   );

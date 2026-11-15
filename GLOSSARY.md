@@ -53,7 +53,7 @@ Decisione manuale, con motivazione, che sostituisce l'Applicabilità calcolata p
 _Avoid_: Eccezione, forzatura
 
 **Notizia**:
-Un singolo articolo (titolo, fonte, data, URL, riassunto) collegato a zero, uno o più Atti normativi.
+Un singolo articolo (titolo, fonte, data, URL, riassunto) collegato a zero, uno o più Atti normativi. È solo un riferimento: non modifica mai un Atto. Se segnala una nuova normativa o un aggiornamento, una persona controlla a mano l'Atto e lo modifica.
 _Avoid_: Articolo, news, feed
 
 **Novità**:
@@ -61,11 +61,11 @@ Un cambiamento rilevato dall'agente (nuovo Atto, cambio di Stato, nuova Notizia 
 _Avoid_: Aggiornamento, alert, coda di revisione
 
 **Provenienza**:
-Indicazione dell'origine di un contenuto: *dalla fonte ufficiale*, *generato dall'agente* o *confermato da una persona*.
+Indicazione dell'origine di un contenuto di un Atto normativo: *dalla fonte ufficiale*, *generato dall'agente* o *confermato da una persona*. Vale per gli Atti, non per le Notizie: il riassunto di una Notizia può restare non verificato.
 _Avoid_: Fonte, stato di verifica
 
 **Avviso di conferma**:
-Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona. Non blocca nulla.
+Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona, più le Notizie che suggeriscono modifiche a Atti esistenti o discutono nuove normative. Una Notizia esce dall'avviso quando una persona la segna come controllata. Non blocca nulla.
 _Avoid_: Notifica, coda di revisione, task
 
 **Fonte**:
