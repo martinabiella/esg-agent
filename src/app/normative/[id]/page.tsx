@@ -27,7 +27,7 @@ export default function SchedaAttoPage(props: PageProps<"/normative/[id]">) {
 }
 
 // Le date del database sono "AAAA-MM-GG": nessun fuso orario da applicare.
-function data(valore: string | null) {
+function dataIt(valore: string | null) {
   if (!valore) return "data non indicata";
   const [a, m, g] = valore.split("-");
   return `${g}/${m}/${a}`;
@@ -71,8 +71,8 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
         </p>
       )}
 
-      <Sezione titolo="Summary">
-        {atto.summary ? <p className="max-w-3xl whitespace-pre-line">{atto.summary}</p> : vuoto("Nessun summary.")}
+      <Sezione titolo="Riepilogo">
+        {atto.summary ? <p className="max-w-3xl whitespace-pre-line">{atto.summary}</p> : vuoto("Nessun riepilogo.")}
       </Sezione>
 
       <Sezione titolo="Criteri di applicabilità">
@@ -142,7 +142,7 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
                   {n.titolo}
                 </a>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {n.fonte} · {data(n.data)}
+                  {n.fonte} · {dataIt(n.data)}
                 </p>
               </li>
             ))}
@@ -157,7 +157,7 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
           <ul className="divide-y border-y">
             {atto.storico.map((s) => (
               <li key={s.id} className="flex gap-3 py-2 text-sm">
-                <span className="w-24 text-muted-foreground">{data(s.data)}</span>
+                <span className="w-24 text-muted-foreground">{dataIt(s.data)}</span>
                 <span>{etichettaStato[s.stato]}</span>
               </li>
             ))}

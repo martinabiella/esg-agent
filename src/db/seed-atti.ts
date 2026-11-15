@@ -130,7 +130,11 @@ async function main() {
       .returning({ id: s.attoNormativo.id });
     if (!riga) continue; // già presente
     inseriti++;
-    const idSettori = a.settori.map((n) => settori.find((x) => x.nome === n)?.id).filter((x): x is number => x !== undefined);
+    const idSettori = a.settori.map((n) => {
+      const trovato = settori.find((x) => x.nome === n);
+      if (!trovato) console.warn(`Settore "${n}" non trovato (esegui prima npm run db:seed): collegamento saltato per "${a.titolo}"`);
+      return trovato?.id;
+    }).filter((x): x is number => x !== undefined);
     if (idSettori.length) await db.insert(s.attoSettore).values(idSettori.map((settoreId) => ({ attoId: riga.id, settoreId })));
     const idTemi = a.temi.map((n) => temi.find((x) => x.nome === n)!.id);
     if (idTemi.length) await db.insert(s.attoTema).values(idTemi.map((temaId) => ({ attoId: riga.id, temaId })));

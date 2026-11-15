@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, exists, ne, or, type SQL } from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import { db } from "./index";
 import type { FiltriAtti } from "@/lib/filtri-atti";
 import {
@@ -12,10 +13,24 @@ import {
   tema,
 } from "./schema";
 
+// L'Atto ha un collegamento (tabella ponte) con l'id dato.
+function collegatoA(
+  ponte: typeof attoSettore | typeof attoTema,
+  colonna: PgColumn,
+  id: number,
+) {
+  return exists(
+    db
+      .select({ attoId: ponte.attoId })
+      .from(ponte)
+      .where(and(eq(ponte.attoId, attoNormativo.id), eq(colonna, id))),
+  );
+}
+
 // Atti dell'elenco. Esclude sempre i "non rilevanti". Senza filtro Stato nasconde
 // anche gli abrogati (restano nel database e raggiungibili con ?stato=abrogato).
 // Il filtro Settore include gli Atti validi per tutti i Settori.
-export async function elencoAtti(filtri: FiltriAtti = {}) {
+export async function elencoAtti(filtri: FiltriAtti) {
   const condizioni: (SQL | undefined)[] = [
     eq(attoNormativo.nonRilevante, false),
     filtri.stato
@@ -26,34 +41,12 @@ export async function elencoAtti(filtri: FiltriAtti = {}) {
     condizioni.push(
       or(
         eq(attoNormativo.tuttiISettori, true),
-        exists(
-          db
-            .select({ attoId: attoSettore.attoId })
-            .from(attoSettore)
-            .where(
-              and(
-                eq(attoSettore.attoId, attoNormativo.id),
-                eq(attoSettore.settoreId, filtri.settoreId),
-              ),
-            ),
-        ),
+        collegatoA(attoSettore, attoSettore.settoreId, filtri.settoreId),
       ),
     );
   }
   if (filtri.temaId !== undefined) {
-    condizioni.push(
-      exists(
-        db
-          .select({ attoId: attoTema.attoId })
-          .from(attoTema)
-          .where(
-            and(
-              eq(attoTema.attoId, attoNormativo.id),
-              eq(attoTema.temaId, filtri.temaId),
-            ),
-          ),
-      ),
-    );
+    condizioni.push(collegatoA(attoTema, attoTema.temaId, filtri.temaId));
   }
   return db
     .select({

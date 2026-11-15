@@ -55,11 +55,3 @@ export function valutaEliminazione(usi: UsiSettore): EsitoEliminazione {
   }
   return { consentita: true, avviso: null };
 }
-
-// Id da URL o form: oltre INT4_MAX Postgres darebbe errore, ed è comunque
-// un id inesistente.
-export function idSettore(grezzo: unknown): number | null {
-  if (typeof grezzo !== "string" || !/^\d+$/.test(grezzo)) return null;
-  const id = Number(grezzo);
-  return id >= 1 && id <= 2147483647 ? id : null;
-}
