@@ -14,7 +14,10 @@ export const metadata = { title: "Normative · Monitoraggio ESG" };
 export default function NormativePage(props: PageProps<"/normative">) {
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Normative</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold">Normative</h1>
+        <Button render={<Link href="/normative/nuovo" />}>Nuovo Atto</Button>
+      </div>
       <Suspense fallback={<Caricamento />}>
         <Contenuto searchParams={props.searchParams} />
       </Suspense>
@@ -91,14 +94,17 @@ async function Contenuto({
       ) : (
         <ul className="mt-6 divide-y border-y">
           {atti.map((a) => (
-            <li key={a.id} className="py-3">
-              <Link href={`/normative/${a.id}`} className="font-medium hover:underline">
-                {a.titolo}
-              </Link>
-              <p className="mt-1 text-sm">
+            <li key={a.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+              <div>
+                <Link href={`/normative/${a.id}`} className="font-medium hover:underline">
+                  {a.titolo}
+                </Link>
+                <p className="mt-1 text-sm">
                 <Badge variant="secondary">{etichettaGiurisdizione[a.giurisdizione]}</Badge>{" "}
-                <Badge>{etichettaStato[a.stato]}</Badge>
-              </p>
+                  <Badge>{etichettaStato[a.stato]}</Badge>
+                </p>
+              </div>
+              <Button variant="outline" size="sm" render={<Link href={`/normative/${a.id}/modifica`} />}>Modifica</Button>
             </li>
           ))}
         </ul>

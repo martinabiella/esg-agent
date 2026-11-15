@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Caricamento } from "@/app/caricamento";
 import { attoDaParams } from "../trova-da-params";
 import {
@@ -52,7 +53,10 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <>
-      <h1 className="mt-2 text-2xl font-semibold">{atto.titolo}</h1>
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+        <h1 className="text-2xl font-semibold">{atto.titolo}</h1>
+        <Button variant="outline" render={<Link href={`/normative/${atto.id}/modifica`} />}>Modifica</Button>
+      </div>
       {atto.identificativoUfficiale && (
         <p className="mt-1 text-sm text-muted-foreground">{atto.identificativoUfficiale}</p>
       )}
@@ -125,6 +129,21 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
             {atto.temi.map((t) => (
               <li key={t.id}>
                 <Badge variant="secondary">{t.nome}</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Sezione>
+
+      <Sezione titolo="Relazioni tra Atti">
+        {atto.relazioni.length === 0 ? (
+          vuoto("Nessuna Relazione indicata.")
+        ) : (
+          <ul className="divide-y border-y">
+            {atto.relazioni.map((r) => (
+              <li key={`${r.tipo}-${r.attoId}`} className="py-2 text-sm">
+                <span className="font-medium">{r.tipo}</span>{" "}
+                <Link href={`/normative/${r.attoId}`} className="underline">{r.titolo}</Link>
               </li>
             ))}
           </ul>
