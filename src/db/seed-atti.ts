@@ -102,6 +102,7 @@ const ATTI: {
 const NOTIZIE = [
   { titolo: "[Esempio] La Commissione presenta il pacchetto di semplificazione", fonte: "Fonte di esempio", data: "2025-02-26", url: "https://example.com/esempio-omnibus", atti: ["ESEMPIO-OMNIBUS", "ESEMPIO-CSRD"] },
   { titolo: "[Esempio] Prorogati i termini per il CBAM", fonte: "Fonte di esempio", data: null, url: "https://example.com/esempio-cbam", atti: ["ESEMPIO-CBAM"] },
+  { titolo: "[Esempio] Pubblicata una guida alla rendicontazione", fonte: "Fonte di esempio", data: "2025-01-15", url: "https://example.com/esempio-guida-rendicontazione", atti: [] },
 ];
 
 async function main() {
