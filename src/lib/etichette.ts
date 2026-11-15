@@ -1,4 +1,4 @@
-import type { giurisdizione, stato } from "@/db/schema";
+import type { giurisdizione, provenienza, stato } from "@/db/schema";
 import type { TipoAtto } from "./tipi-atto";
 
 export const etichettaGiurisdizione: Record<
@@ -30,4 +30,13 @@ export const etichettaTipoAtto: Record<TipoAtto, string> = {
   decreto: "Decreto",
   disegno_di_legge: "Disegno di legge",
   altro: "Altro",
+};
+
+export const etichettaProvenienza: Record<
+  (typeof provenienza.enumValues)[number],
+  string
+> = {
+  fonte_ufficiale: "Dalla fonte ufficiale",
+  agente: "Generato dall'agente",
+  persona: "Confermato da una persona",
 };

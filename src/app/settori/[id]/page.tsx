@@ -59,7 +59,9 @@ async function Scheda({
         <ul className="mt-2 divide-y border-y">
           {atti.map((a) => (
             <li key={a.id} className="py-3">
-              <span className="font-medium">{a.titolo}</span>
+              <Link href={`/normative/${a.id}`} className="font-medium hover:underline">
+                {a.titolo}
+              </Link>
               <p className="mt-1 text-sm opacity-70">
                 <Badge variant="secondary">{etichettaGiurisdizione[a.giurisdizione]}</Badge>{" "}
                 <Badge variant="outline">{etichettaTipoAtto[a.tipo]}</Badge>{" "}
