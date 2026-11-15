@@ -10,7 +10,9 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { TIPI_ATTO } from "../lib/tipi-atto";
 
 // Vocabolario: vedi GLOSSARY.md
@@ -41,11 +43,16 @@ export const provenienza = pgEnum("provenienza", [
   "persona",
 ]);
 
-export const settore = pgTable("settore", {
-  id: serial("id").primaryKey(),
-  nome: text("nome").notNull().unique(),
-  descrizione: text("descrizione").notNull().default(""),
-});
+export const settore = pgTable(
+  "settore",
+  {
+    id: serial("id").primaryKey(),
+    nome: text("nome").notNull(),
+    descrizione: text("descrizione").notNull().default(""),
+  },
+  // Nome unico senza distinguere maiuscole e minuscole.
+  (t) => [uniqueIndex("settore_nome_lower_idx").on(sql`lower(${t.nome})`)],
+);
 
 export const tema = pgTable("tema", {
   id: serial("id").primaryKey(),

@@ -15,6 +15,13 @@
       "when": 1794680487453,
       "tag": "0001_bouncy_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794765203959,
+      "tag": "0002_fast_frog_thor",
+      "breakpoints": true
     }
   ]
 }
