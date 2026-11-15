@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { utenteRichiesto } from "@/lib/auth";
 import { NonAutenticatoError } from "@/lib/utente-richiesto";
-import { aggiornaAtto, creaAtto, giurisdizioniAtti, trovaAtto } from "@/db/atti";
+import { aggiornaAtto, creaAtto, eliminaAtto, giurisdizioniAtti, trovaAtto } from "@/db/atti";
 import {
   type ErroriAtto,
   type EsitoAtto,
@@ -161,6 +162,21 @@ export async function aggiornaAttoAzione(_stato: StatoModuloAtto, formData: Form
   revalidatePath("/normative");
   revalidatePath(`/normative/${id}`);
   return { salvato: { id, esito: "modificato" } };
+}
+
+export async function eliminaAttoAzione(
+  _stato: StatoModuloAtto,
+  formData: FormData,
+): Promise<StatoModuloAtto> {
+  const id = idIntero(formData.get("id"));
+  const sessioneMancante = await sessione();
+  if (sessioneMancante) return { errore: sessioneMancante };
+  if (id === null) return { errore: "L'Atto non esiste più." };
+
+  const scrittura = await eliminaAtto(id);
+  if (!scrittura.ok) return { errore: "L'Atto non esiste più." };
+  revalidatePath("/normative");
+  redirect("/normative?esito=eliminato");
 }
 
 function moduloDaEsito(input: InputAzione, esito: EsitoAtto): ValoriModuloAtto {

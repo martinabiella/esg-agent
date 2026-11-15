@@ -12,6 +12,7 @@ import {
 } from "@/lib/etichette";
 import { righeSoglie } from "@/lib/soglie";
 import { ClientiToccati } from "./clienti-toccati";
+import { EliminaAtto } from "../elimina-atto";
 
 export const metadata = { title: "Atto normativo · Monitoraggio ESG" };
 
@@ -56,7 +57,12 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
     <>
       <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
         <h1 className="text-2xl font-semibold">{atto.titolo}</h1>
-        <Button variant="outline" render={<Link href={`/normative/${atto.id}/modifica`} />}>Modifica</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" render={<Link href={`/normative/${atto.id}/modifica`} />}>
+            Modifica
+          </Button>
+          <EliminaAtto id={atto.id} titolo={atto.titolo} />
+        </div>
       </div>
       {atto.identificativoUfficiale && (
         <p className="mt-1 text-sm text-muted-foreground">{atto.identificativoUfficiale}</p>

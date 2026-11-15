@@ -45,7 +45,7 @@ export async function elencoAtti(filtri: FiltriAtti) {
   if (filtri.temaId !== undefined) {
     condizioni.push(collegatoA(attoTema, attoTema.temaId, filtri.temaId));
   }
-  return db
+  const atti = await db
     .select({
       id: attoNormativo.id,
       titolo: attoNormativo.titolo,
@@ -57,6 +57,59 @@ export async function elencoAtti(filtri: FiltriAtti) {
     .from(attoNormativo)
     .where(and(...condizioni))
     .orderBy(asc(attoNormativo.titolo));
+
+  if (atti.length === 0) {
+    return atti.map((atto) => ({ ...atto, settori: [], temi: [], statoRecente: atto.stato }));
+  }
+
+  const ids = atti.map((atto) => atto.id);
+  const [settori, temi, storico] = await Promise.all([
+    db
+      .select({ attoId: attoSettore.attoId, id: settore.id, nome: settore.nome })
+      .from(attoSettore)
+      .innerJoin(settore, eq(settore.id, attoSettore.settoreId))
+      .where(inArray(attoSettore.attoId, ids))
+      .orderBy(asc(settore.nome)),
+    db
+      .select({ attoId: attoTema.attoId, id: tema.id, nome: tema.nome })
+      .from(attoTema)
+      .innerJoin(tema, eq(tema.id, attoTema.temaId))
+      .where(inArray(attoTema.attoId, ids))
+      .orderBy(asc(tema.nome)),
+    db
+      .select({ attoId: statoStorico.attoId, stato: statoStorico.stato, data: statoStorico.data, id: statoStorico.id })
+      .from(statoStorico)
+      .where(inArray(statoStorico.attoId, ids))
+      .orderBy(desc(statoStorico.data), desc(statoStorico.id)),
+  ]);
+
+  const settoriPerAtto = new Map<number, { id: number; nome: string }[]>();
+  for (const s of settori) {
+    const elenco = settoriPerAtto.get(s.attoId) ?? [];
+    elenco.push({ id: s.id, nome: s.nome });
+    settoriPerAtto.set(s.attoId, elenco);
+  }
+
+  const temiPerAtto = new Map<number, { id: number; nome: string }[]>();
+  for (const t of temi) {
+    const elenco = temiPerAtto.get(t.attoId) ?? [];
+    elenco.push({ id: t.id, nome: t.nome });
+    temiPerAtto.set(t.attoId, elenco);
+  }
+
+  const statoRecentePerAtto = new Map<number, (typeof storico)[number]["stato"]>();
+  for (const voce of storico) {
+    if (!statoRecentePerAtto.has(voce.attoId)) {
+      statoRecentePerAtto.set(voce.attoId, voce.stato);
+    }
+  }
+
+  return atti.map((atto) => ({
+    ...atto,
+    settori: settoriPerAtto.get(atto.id) ?? [],
+    temi: temiPerAtto.get(atto.id) ?? [],
+    statoRecente: statoRecentePerAtto.get(atto.id) ?? atto.stato,
+  }));
 }
 
 export function attiDelSettore(settoreId: number) {
@@ -313,4 +366,12 @@ export async function aggiornaAtto(id: number, valori: CampiAtto): Promise<Esito
     if (codice === VIOLAZIONE_CHIAVE_ESTERNA) return { ok: false, motivo: "collegamento_inesistente" };
     throw e;
   }
+}
+
+export async function eliminaAtto(id: number): Promise<EsitoScritturaAtto> {
+  const righe = await db
+    .delete(attoNormativo)
+    .where(eq(attoNormativo.id, id))
+    .returning({ id: attoNormativo.id });
+  return righe.length ? { ok: true, id } : { ok: false, motivo: "non_trovato" };
 }
