@@ -6,6 +6,7 @@ import { Caricamento } from "@/app/caricamento";
 import { attiDelSettore } from "@/db/atti";
 import { settoreDaParams } from "../trova-da-params";
 import { Esito } from "../esito";
+import { EliminaSettore } from "../elimina-settore";
 import {
   etichettaGiurisdizione,
   etichettaStato,
@@ -45,9 +46,7 @@ async function Scheda({
           <Button variant="outline" render={<Link href={`/settori/${id}/modifica`} />}>
             Modifica
           </Button>
-          <Button variant="destructive" render={<Link href={`/settori/${id}/elimina`} />}>
-            Elimina
-          </Button>
+          <EliminaSettore id={id} nome={settore.nome} />
         </div>
       </div>
       {settore.descrizione && <p className="mt-2 max-w-2xl text-muted-foreground">{settore.descrizione}</p>}

@@ -8,6 +8,7 @@ import {
   ComboboxChipsInput,
   ComboboxContent,
   ComboboxEmpty,
+  ComboboxInput,
   ComboboxItem,
   ComboboxList,
   ComboboxValue,
@@ -27,15 +28,19 @@ export function SelezioneMultipla({
   vuoto,
   descrittoDa,
   nonValido,
+  disabled,
+  onChange,
 }: {
   id: string;
-  name: string;
+  name?: string;
   voci: Voce[];
   iniziali: string[];
   segnaposto: string;
   vuoto: string;
   descrittoDa?: string;
   nonValido?: boolean;
+  disabled?: boolean;
+  onChange?: (valori: string[]) => void;
 }) {
   const ancora = useComboboxAnchor();
   const [scelti, setScelti] = useState<Voce[]>(() =>
@@ -44,14 +49,18 @@ export function SelezioneMultipla({
 
   return (
     <>
-      {scelti.map((v) => (
+      {name && !disabled && scelti.map((v) => (
         <input key={v.value} type="hidden" name={name} value={v.value} />
       ))}
       <Combobox
         multiple
+        disabled={disabled}
         items={voci}
         value={scelti}
-        onValueChange={setScelti}
+        onValueChange={(valori) => {
+          setScelti(valori);
+          onChange?.(valori.map((valore) => valore.value));
+        }}
         isItemEqualToValue={(a: Voce, b: Voce) => a.value === b.value}
       >
         <ComboboxChips ref={ancora}>
@@ -83,5 +92,44 @@ export function SelezioneMultipla({
         </ComboboxContent>
       </Combobox>
     </>
+  );
+}
+
+export function SelezioneSingola({
+  id,
+  voci,
+  valore,
+  segnaposto,
+  vuoto,
+  onChange,
+}: {
+  id: string;
+  voci: Voce[];
+  valore: string;
+  segnaposto: string;
+  vuoto: string;
+  onChange: (valore: string) => void;
+}) {
+  const selezionato = voci.find((voce) => voce.value === valore) ?? null;
+
+  return (
+    <Combobox
+      items={voci}
+      value={selezionato}
+      onValueChange={(voce) => onChange(voce?.value ?? "")}
+      isItemEqualToValue={(a: Voce, b: Voce) => a.value === b.value}
+    >
+      <ComboboxInput id={id} placeholder={segnaposto} showClear />
+      <ComboboxContent>
+        <ComboboxEmpty>{vuoto}</ComboboxEmpty>
+        <ComboboxList>
+          {(voce: Voce) => (
+            <ComboboxItem key={voce.value} value={voce}>
+              {voce.label}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }
