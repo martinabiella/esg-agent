@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { Caricamento } from "@/app/caricamento";
 import { attiDelSettore } from "@/db/atti";
 import { trovaSettore } from "@/db/settori";
+import { idSettore } from "@/lib/settore";
+import { Esito } from "../esito";
 import {
   etichettaGiurisdizione,
   etichettaStato,
@@ -17,24 +19,39 @@ export default function SchedaSettorePage(props: PageProps<"/settori/[id]">) {
         ← Tutti i Settori
       </Link>
       <Suspense fallback={<Caricamento />}>
-        <Scheda params={props.params} />
+        <Scheda params={props.params} searchParams={props.searchParams} />
       </Suspense>
     </div>
   );
 }
 
-async function Scheda({ params }: { params: Promise<{ id: string }> }) {
-  const { id: idGrezzo } = await params;
-  const id = Number(idGrezzo);
-  // Oltre INT4_MAX Postgres darebbe errore: è comunque un id inesistente.
-  if (!Number.isInteger(id) || id < 1 || id > 2147483647) notFound();
+async function Scheda({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const id = idSettore((await params).id);
+  if (id === null) notFound();
   const settore = await trovaSettore(id);
   if (!settore) notFound();
   const atti = await attiDelSettore(id);
 
   return (
     <>
-      <h1 className="mt-2 text-2xl font-semibold">{settore.nome}</h1>
+      <Esito esito={(await searchParams).esito} />
+      <div className="mt-2 flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold">{settore.nome}</h1>
+        <div className="flex gap-3 text-sm">
+          <Link href={`/settori/${id}/modifica`} className="rounded border px-3 py-2 font-medium">
+            Modifica
+          </Link>
+          <Link href={`/settori/${id}/elimina`} className="rounded border border-red-600 px-3 py-2 font-medium text-red-600">
+            Elimina
+          </Link>
+        </div>
+      </div>
       {settore.descrizione && <p className="mt-2 max-w-2xl">{settore.descrizione}</p>}
 
       <h2 className="mt-8 text-lg font-semibold">Normative che riguardano il Settore</h2>
