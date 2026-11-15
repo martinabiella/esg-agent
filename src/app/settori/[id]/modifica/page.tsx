@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Caricamento } from "@/app/caricamento";
 import { settoreDaParams } from "../../trova-da-params";
 import { aggiornaSettoreAzione } from "../../azioni";
@@ -20,9 +21,9 @@ async function Modulo({ params }: { params: Promise<{ id: string }> }) {
   const id = settore.id;
   return (
     <>
-      <Link href={`/settori/${id}`} className="text-sm hover:underline">
+      <Button variant="link" render={<Link href={`/settori/${id}`} />}>
         ← {settore.nome}
-      </Link>
+      </Button>
       <h1 className="mt-2 text-2xl font-semibold">Modifica Settore</h1>
       <FormSettore
         azione={aggiornaSettoreAzione}

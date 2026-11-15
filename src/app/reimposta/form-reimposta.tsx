@@ -1,6 +1,10 @@
 "use client";
 
 import { useActionState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { reimposta } from "./azioni";
 
 export function FormReimposta({ token }: { token: string }) {
@@ -8,40 +12,36 @@ export function FormReimposta({ token }: { token: string }) {
   return (
     <form action={azione} className="mt-6 flex flex-col gap-4">
       <input type="hidden" name="token" value={token} />
-      <label className="flex flex-col gap-1 text-sm">
-        Nuova password
-        <input
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="password">Nuova password</Label>
+        <Input
+          id="password"
           name="password"
           type="password"
           autoComplete="new-password"
           minLength={8}
           required
-          className="border rounded px-3 py-2"
         />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Conferma password
-        <input
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="conferma">Conferma password</Label>
+        <Input
+          id="conferma"
           name="conferma"
           type="password"
           autoComplete="new-password"
           minLength={8}
           required
-          className="border rounded px-3 py-2"
         />
-      </label>
+      </div>
       {stato?.errore && (
-        <p role="alert" className="text-sm text-red-600">
-          {stato.errore}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{stato.errore}</AlertDescription>
+        </Alert>
       )}
-      <button
-        type="submit"
-        disabled={inCorso}
-        className="rounded border px-3 py-2 text-sm font-medium disabled:opacity-50"
-      >
+      <Button type="submit" disabled={inCorso} className="w-full">
         {inCorso ? "Salvataggio…" : "Imposta password"}
-      </button>
+      </Button>
     </form>
   );
 }

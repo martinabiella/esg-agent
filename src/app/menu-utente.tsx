@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
 import { esci } from "./accedi/azioni";
 
@@ -14,17 +15,17 @@ export async function MenuUtente() {
   if (!sessione?.user) return null;
   return (
     <>
-      <nav className="flex gap-4 text-sm">
+      <nav className="flex gap-1 text-sm" aria-label="Navigazione principale">
         {voci.map((v) => (
-          <Link key={v.href} href={v.href} className="hover:underline">
+          <Button key={v.href} variant="ghost" size="sm" render={<Link href={v.href} />}>
             {v.label}
-          </Link>
+          </Button>
         ))}
       </nav>
       <form action={esci} className="ml-auto">
-        <button type="submit" className="text-sm hover:underline">
+        <Button type="submit" variant="ghost" size="sm">
           Esci
-        </button>
+        </Button>
       </form>
     </>
   );

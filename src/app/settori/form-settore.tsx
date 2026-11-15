@@ -2,6 +2,11 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import type { CampiSettore } from "@/lib/settore";
 import type { StatoModulo } from "./azioni";
 
@@ -25,50 +30,46 @@ export function FormSettore({
   return (
     <form action={esegui} className="mt-6 flex max-w-xl flex-col gap-4">
       {id !== undefined && <input type="hidden" name="id" value={id} />}
-      <label className="flex flex-col gap-1 text-sm">
-        Nome
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="nome">Nome</Label>
         {/* key: dopo un errore il campo riparte da quanto digitato */}
-        <input
+        <Input
           key={`nome-${valori.nome}`}
+          id="nome"
           name="nome"
           defaultValue={valori.nome}
           required
           aria-invalid={!!stato?.errori?.nome}
           aria-describedby={stato?.errori?.nome ? "errore-nome" : undefined}
-          className="rounded border px-3 py-2"
         />
         {stato?.errori?.nome && (
-          <span id="errore-nome" role="alert" className="text-red-600">
+          <p id="errore-nome" role="alert" className="text-sm text-destructive">
             {stato.errori.nome}
-          </span>
+          </p>
         )}
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Descrizione (attività incluse)
-        <textarea
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="descrizione">Descrizione (attività incluse)</Label>
+        <Textarea
           key={`descrizione-${valori.descrizione}`}
+          id="descrizione"
           name="descrizione"
           defaultValue={valori.descrizione}
           rows={4}
-          className="rounded border px-3 py-2"
         />
-      </label>
+      </div>
       {stato?.errore && (
-        <p role="alert" className="text-sm text-red-600">
-          {stato.errore}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{stato.errore}</AlertDescription>
+        </Alert>
       )}
       <div className="flex items-center gap-4">
-        <button
-          type="submit"
-          disabled={inCorso}
-          className="rounded border px-3 py-2 text-sm font-medium disabled:opacity-50"
-        >
+        <Button type="submit" disabled={inCorso}>
           {inCorso ? "Salvataggio…" : etichettaInvio}
-        </button>
-        <Link href={hrefAnnulla} className="text-sm hover:underline">
+        </Button>
+        <Button variant="link" render={<Link href={hrefAnnulla} />}>
           Annulla
-        </Link>
+        </Button>
       </div>
     </form>
   );

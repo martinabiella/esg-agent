@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Caricamento } from "@/app/caricamento";
 import { percorsoInterno } from "@/lib/redirect-sicuro";
 import { FormAccesso } from "./form-accesso";
@@ -11,12 +12,16 @@ export default function PaginaAccesso({
   searchParams: Promise<{ dopo?: string | string[] }>;
 }) {
   return (
-    <div className="max-w-sm mx-auto mt-12">
-      <h1 className="text-2xl font-semibold">Accedi</h1>
-      <Suspense fallback={<Caricamento />}>
-        <Modulo searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <Card className="mx-auto mt-12 max-w-sm">
+      <CardHeader>
+        <CardTitle>Accedi</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Suspense fallback={<Caricamento />}>
+          <Modulo searchParams={searchParams} />
+        </Suspense>
+      </CardContent>
+    </Card>
   );
 }
 

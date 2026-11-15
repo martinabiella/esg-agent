@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Caricamento } from "@/app/caricamento";
 import { elencoSettori } from "@/db/settori";
 import { Esito } from "./esito";
@@ -11,9 +12,7 @@ export default function SettoriPage(props: PageProps<"/settori">) {
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Settori</h1>
-        <Link href="/settori/nuovo" className="rounded border px-3 py-2 text-sm font-medium">
-          Nuovo Settore
-        </Link>
+        <Button render={<Link href="/settori/nuovo" />}>Nuovo Settore</Button>
       </div>
       <Suspense>
         <EsitoDaIndirizzo searchParams={props.searchParams} />
@@ -36,7 +35,7 @@ async function EsitoDaIndirizzo({
 async function Elenco() {
   const settori = await elencoSettori();
   if (settori.length === 0) {
-    return <p className="mt-4 text-sm opacity-70">Nessun Settore presente.</p>;
+    return <p className="mt-4 text-sm text-muted-foreground">Nessun Settore presente.</p>;
   }
   return (
     <ul className="mt-4 divide-y border-y">
@@ -46,7 +45,7 @@ async function Elenco() {
             {s.nome}
           </Link>
           {s.descrizione && (
-            <p className="mt-1 text-sm opacity-70">{s.descrizione}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{s.descrizione}</p>
           )}
         </li>
       ))}
