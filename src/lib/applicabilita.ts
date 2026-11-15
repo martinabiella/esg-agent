@@ -1,10 +1,10 @@
 // Vocabolario: vedi GLOSSARY.md (Applicabilità, Soglia, Criteri di applicabilità)
 //
-// Forma di criteriSoglie riconosciuta dal calcolo:
-//   { richieste?: number, soglie: Soglia[] }
-//   Soglia = { campo: "dipendenti" | "fatturato", min?: number, max?: number }
-//          | { campo: "paesi", inclusi: string[] }
-// `richieste` è il numero di Soglie da rispettare (default: tutte).
+// Forma di criteriSoglie riconosciuta dal calcolo (prodotta dal modulo Atto, vedi CriteriSoglie in atto.ts):
+//   { minimoSoglie?: number, soglie: Soglia[] }
+//   Soglia = { campo: "dipendenti" | "fatturato", minimo?: number | string | null, massimo?: ... }
+//          | { campo: "paesi", paesi: string[] }
+// `minimoSoglie` è il numero di Soglie da rispettare (default: tutte).
 // Qualsiasi altra forma o altro `campo` è una Soglia sconosciuta: "da verificare".
 
 export type Applicabilita = "applicabile" | "non_applicabile" | "da_verificare";
@@ -37,13 +37,15 @@ function isOggetto(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
+// Numeri, o stringhe numeriche (il fatturato viaggia come stringa).
 function numeroOppure(v: unknown): number | undefined {
+  if (typeof v === "string" && v.trim() !== "") v = Number(v);
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
 }
 
 function confrontaIntervallo(valore: number | null, soglia: Record<string, unknown>): EsitoSoglia {
-  const min = numeroOppure(soglia.min);
-  const max = numeroOppure(soglia.max);
+  const min = numeroOppure(soglia.minimo);
+  const max = numeroOppure(soglia.massimo);
   // Nessun limite valido: la Soglia non dice nulla di calcolabile.
   if (min === undefined && max === undefined) return "sconosciuta";
   if (valore === null || Number.isNaN(valore)) return "sconosciuta";
@@ -63,7 +65,7 @@ function valutaSoglia(soglia: unknown, cliente: ClientePerCalcolo): EsitoSoglia 
         soglia,
       );
     case "paesi": {
-      const inclusi = soglia.inclusi;
+      const inclusi = soglia.paesi;
       if (!Array.isArray(inclusi) || inclusi.length === 0 || !inclusi.every((p) => typeof p === "string")) {
         return "sconosciuta";
       }
@@ -83,7 +85,7 @@ function leggiSoglie(criteriSoglie: unknown): { soglie: unknown[]; richieste: nu
     return { soglie: [SCONOSCIUTA], richieste: 1 };
   }
   const soglie = criteriSoglie.soglie;
-  const richieste = numeroOppure(criteriSoglie.richieste);
+  const richieste = numeroOppure(criteriSoglie.minimoSoglie);
   const valida = richieste !== undefined && Number.isInteger(richieste) && richieste >= 1;
   return { soglie, richieste: valida ? Math.min(richieste, soglie.length) : soglie.length };
 }

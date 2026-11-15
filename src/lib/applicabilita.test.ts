@@ -25,8 +25,8 @@ function cliente(parziale: Partial<ClientePerCalcolo> = {}): ClientePerCalcolo {
   return { dipendenti: null, fatturato: null, paesi: null, settori: [CHIMICA], ...parziale };
 }
 
-const dip = { campo: "dipendenti", min: 250 };
-const fat = { campo: "fatturato", min: 50_000_000 };
+const dip = { campo: "dipendenti", minimo: 250 };
+const fat = { campo: "fatturato", minimo: "50000000" };
 
 test("1-4: una Soglia sui dipendenti, minimo incluso", () => {
   const a = atto({ criteriSoglie: { soglie: [dip] } });
@@ -45,7 +45,7 @@ test("5-8: due Soglie, tutte da rispettare (default)", () => {
 });
 
 test("9-11: due Soglie, ne basta una", () => {
-  const a = atto({ criteriSoglie: { richieste: 1, soglie: [dip, fat] } });
+  const a = atto({ criteriSoglie: { minimoSoglie: 1, soglie: [dip, fat] } });
   assert.equal(calcolaApplicabilita(a, cliente({ dipendenti: 300 })), "applicabile");
   assert.equal(calcolaApplicabilita(a, cliente({ dipendenti: 200 })), "da_verificare");
   assert.equal(calcolaApplicabilita(a, cliente({ dipendenti: 200, fatturato: "10000000" })), "non_applicabile");
@@ -77,12 +77,12 @@ test("Settore diverso batte Soglie rispettate", () => {
 });
 
 test("14: Soglia sui paesi con paesi non indicati: da verificare", () => {
-  const a = atto({ criteriSoglie: { soglie: [{ campo: "paesi", inclusi: ["IT"] }] } });
+  const a = atto({ criteriSoglie: { soglie: [{ campo: "paesi", paesi: ["IT"] }] } });
   assert.equal(calcolaApplicabilita(a, cliente({ paesi: null })), "da_verificare");
 });
 
 test("Soglia sui paesi: rispettata o violata se i paesi sono noti", () => {
-  const a = atto({ criteriSoglie: { soglie: [{ campo: "paesi", inclusi: ["IT"] }] } });
+  const a = atto({ criteriSoglie: { soglie: [{ campo: "paesi", paesi: ["IT"] }] } });
   assert.equal(calcolaApplicabilita(a, cliente({ paesi: ["FR", "IT"] })), "applicabile");
   assert.equal(calcolaApplicabilita(a, cliente({ paesi: ["FR"] })), "non_applicabile");
 });
@@ -117,24 +117,24 @@ test("Tutti i Settori ma testo libero e nessuna Soglia: da verificare", () => {
 });
 
 test("18: Soglia su un dato che il Cliente non ha: da verificare", () => {
-  const a = atto({ criteriSoglie: { soglie: [{ campo: "importazioni", min: 50 }] } });
+  const a = atto({ criteriSoglie: { soglie: [{ campo: "importazioni", minimo: 50 }] } });
   assert.equal(calcolaApplicabilita(a, cliente({ dipendenti: 1000 })), "da_verificare");
 });
 
 test("Soglia sconosciuta con le altre violate: non applicabile se tutte richieste", () => {
-  const a = atto({ criteriSoglie: { soglie: [dip, { campo: "importazioni", min: 50 }] } });
+  const a = atto({ criteriSoglie: { soglie: [dip, { campo: "importazioni", minimo: 50 }] } });
   assert.equal(calcolaApplicabilita(a, cliente({ dipendenti: 10 })), "non_applicabile");
 });
 
 test("Forma delle Soglie non riconosciuta: da verificare", () => {
-  const vecchia = atto({ criteriSoglie: { dipendenti_min: 250 } });
+  const vecchia = atto({ criteriSoglie: { dipendenti_minimo: 250 } });
   assert.equal(calcolaApplicabilita(vecchia, cliente({ dipendenti: 10 })), "da_verificare");
   const lista = atto({ criteriSoglie: [{ campo: "importazioni", min_tonnellate: 50 }] });
   assert.equal(calcolaApplicabilita(lista, cliente()), "da_verificare");
 });
 
 test("Soglia con massimo", () => {
-  const a = atto({ criteriSoglie: { soglie: [{ campo: "dipendenti", max: 249 }] } });
+  const a = atto({ criteriSoglie: { soglie: [{ campo: "dipendenti", massimo: 249 }] } });
   assert.equal(calcolaApplicabilita(a, cliente({ dipendenti: 100 })), "applicabile");
   assert.equal(calcolaApplicabilita(a, cliente({ dipendenti: 250 })), "non_applicabile");
 });
