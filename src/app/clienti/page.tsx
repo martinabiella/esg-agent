@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Caricamento } from "@/app/caricamento";
 import { elencoClienti } from "@/db/clienti";
+import { elencoSettori } from "@/db/settori";
 import { TabellaClienti } from "./tabella-clienti";
 
 export const metadata = { title: "Clienti · Monitoraggio ESG" };
@@ -17,10 +18,11 @@ export default function ClientiPage() {
 }
 
 async function Elenco() {
-  const clienti = await elencoClienti();
-  if (clienti.length === 0) {
-    return <p className="mt-4 text-sm text-muted-foreground">Nessun Cliente presente.</p>;
-  }
-
-  return <TabellaClienti clienti={clienti} />;
+  const [clienti, settori] = await Promise.all([elencoClienti(), elencoSettori()]);
+  return (
+    <TabellaClienti
+      clienti={clienti}
+      settori={settori.map((s) => ({ id: s.id, nome: s.nome }))}
+    />
+  );
 }

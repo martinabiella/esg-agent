@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Drawer,
   DrawerContent,
@@ -19,8 +21,54 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { ClienteConSettori } from "@/db/clienti";
-import { formattaFatturato } from "@/lib/cliente";
-import { nomePaese } from "@/lib/paesi";
+import { formattaFatturato, type ValoriModulo } from "@/lib/cliente";
+import { elencoPaesi, nomePaese } from "@/lib/paesi";
+import {
+  aggiornaClienteAzione,
+  creaClienteAzione,
+  type EsitoOperazione,
+} from "./azioni";
+import { EliminaCliente } from "./elimina-cliente";
+import { FormCliente } from "./form-cliente";
+import type { Voce } from "./selezione-multipla";
+
+const MESSAGGI: Record<EsitoOperazione, string> = {
+  creato: "Cliente creato.",
+  modificato: "Modifiche salvate.",
+  eliminato: "Cliente eliminato.",
+};
+
+const PAESI: Voce[] = elencoPaesi().map((p) => ({ value: p.codice, label: p.nome }));
+
+const MODULO_VUOTO: ValoriModulo = {
+  ragioneSociale: "",
+  attivitaSpecifica: "",
+  settori: [],
+  dipendenti: "",
+  fatturato: "",
+  annoRiferimento: "",
+  paesi: [],
+  note: "",
+};
+
+function valoriDi(cliente: ClienteConSettori): ValoriModulo {
+  return {
+    ragioneSociale: cliente.ragioneSociale,
+    attivitaSpecifica: cliente.attivitaSpecifica,
+    settori: cliente.settori.map((s) => String(s.id)),
+    dipendenti: cliente.dipendenti === null ? "" : String(cliente.dipendenti),
+    fatturato: cliente.fatturato ?? "",
+    annoRiferimento: cliente.annoRiferimento === null ? "" : String(cliente.annoRiferimento),
+    paesi: cliente.paesi ?? [],
+    note: cliente.note ?? "",
+  };
+}
+
+// Cosa mostra il drawer: il dettaglio di un Cliente, il modulo di modifica o quello di creazione.
+type Vista =
+  | { tipo: "dettaglio"; id: number }
+  | { tipo: "modifica"; id: number }
+  | { tipo: "nuovo" };
 
 function Settori({ cliente }: { cliente: ClienteConSettori }) {
   if (cliente.settori.length === 0) {
@@ -89,17 +137,60 @@ function DettaglioCliente({ cliente }: { cliente: ClienteConSettori }) {
   );
 }
 
-export function TabellaClienti({ clienti }: { clienti: ClienteConSettori[] }) {
-  const [selezionato, setSelezionato] = useState<ClienteConSettori | null>(null);
+export function TabellaClienti({
+  clienti,
+  settori,
+}: {
+  clienti: ClienteConSettori[];
+  settori: { id: number; nome: string }[];
+}) {
+  const [vista, setVista] = useState<Vista | null>(null);
   const [aperto, setAperto] = useState(false);
+  const [esito, setEsito] = useState<EsitoOperazione | null>(null);
 
-  function apri(cliente: ClienteConSettori) {
-    setSelezionato(cliente);
+  const vociSettori: Voce[] = settori.map((s) => ({ value: String(s.id), label: s.nome }));
+  const selezionato =
+    vista && vista.tipo !== "nuovo" ? clienti.find((c) => c.id === vista.id) : undefined;
+
+  function mostra(nuova: Vista) {
+    setVista(nuova);
     setAperto(true);
   }
 
+  function apri(cliente: ClienteConSettori) {
+    setEsito(null);
+    mostra({ tipo: "dettaglio", id: cliente.id });
+  }
+
+  const dopoSalvataggio = useCallback((id: number, e: EsitoOperazione) => {
+    setEsito(e);
+    setVista({ tipo: "dettaglio", id });
+  }, []);
+
+  const dopoEliminazione = useCallback(() => {
+    setEsito("eliminato");
+    setAperto(false);
+  }, []);
+
   return (
     <>
+      <div className="mt-4 flex items-center justify-between gap-4">
+        <div className="flex-1">
+          {esito === "eliminato" && !aperto && (
+            <Alert role="status" className="border-green-600 text-green-700">
+              <AlertDescription>{MESSAGGI.eliminato}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+        <Button
+          onClick={() => {
+            setEsito(null);
+            mostra({ tipo: "nuovo" });
+          }}
+        >
+          Nuovo Cliente
+        </Button>
+      </div>
       <div className="mt-4 rounded-lg border">
         <Table>
           <TableHeader>
@@ -115,6 +206,13 @@ export function TabellaClienti({ clienti }: { clienti: ClienteConSettori[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {clienti.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-muted-foreground">
+                  Nessun Cliente presente.
+                </TableCell>
+              </TableRow>
+            )}
             {clienti.map((cliente) => (
               <TableRow
                 key={cliente.id}
@@ -164,13 +262,71 @@ export function TabellaClienti({ clienti }: { clienti: ClienteConSettori[] }) {
 
       <Drawer open={aperto} onOpenChange={setAperto} swipeDirection="right">
         <DrawerContent>
-          {selezionato && (
+          {vista?.tipo === "nuovo" && (
+            <>
+              <DrawerHeader>
+                <DrawerTitle>Nuovo Cliente</DrawerTitle>
+                <DrawerDescription>I campi con * sono obbligatori.</DrawerDescription>
+              </DrawerHeader>
+              <FormCliente
+                key="nuovo"
+                azione={creaClienteAzione}
+                iniziali={MODULO_VUOTO}
+                settori={vociSettori}
+                paesi={PAESI}
+                etichettaInvio="Crea Cliente"
+                onAnnulla={() => setAperto(false)}
+                onSalvato={dopoSalvataggio}
+              />
+            </>
+          )}
+          {vista?.tipo === "modifica" && selezionato && (
+            <>
+              <DrawerHeader>
+                <DrawerTitle>Modifica {selezionato.ragioneSociale}</DrawerTitle>
+                <DrawerDescription>I campi con * sono obbligatori.</DrawerDescription>
+              </DrawerHeader>
+              <FormCliente
+                key={`modifica-${selezionato.id}`}
+                azione={aggiornaClienteAzione}
+                id={selezionato.id}
+                iniziali={valoriDi(selezionato)}
+                settori={vociSettori}
+                paesi={PAESI}
+                etichettaInvio="Salva modifiche"
+                onAnnulla={() => setVista({ tipo: "dettaglio", id: selezionato.id })}
+                onSalvato={dopoSalvataggio}
+              />
+            </>
+          )}
+          {vista?.tipo === "dettaglio" && selezionato && (
             <>
               <DrawerHeader>
                 <DrawerTitle>{selezionato.ragioneSociale}</DrawerTitle>
                 <DrawerDescription>{selezionato.attivitaSpecifica}</DrawerDescription>
               </DrawerHeader>
+              {esito && esito !== "eliminato" && (
+                <Alert role="status" className="mx-4 w-auto border-green-600 text-green-700">
+                  <AlertDescription>{MESSAGGI[esito]}</AlertDescription>
+                </Alert>
+              )}
               <DettaglioCliente cliente={selezionato} />
+              <div className="flex items-center gap-2 border-t p-4">
+                <Button
+                  onClick={() => {
+                    setEsito(null);
+                    setVista({ tipo: "modifica", id: selezionato.id });
+                  }}
+                >
+                  Modifica
+                </Button>
+                <EliminaCliente
+                  key={selezionato.id}
+                  id={selezionato.id}
+                  ragioneSociale={selezionato.ragioneSociale}
+                  onEliminato={dopoEliminazione}
+                />
+              </div>
             </>
           )}
         </DrawerContent>
