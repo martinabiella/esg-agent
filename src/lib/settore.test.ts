@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { idSettore, validaSettore, valutaEliminazione } from "./settore";
+import { validaSettore, valutaEliminazione } from "./settore";
 
 test("un nome valido è accettato e ripulito dagli spazi ai bordi", () => {
   assert.deepEqual(validaSettore({ nome: "  Energia ", descrizione: " Gas e luce " }), {
@@ -57,15 +57,4 @@ test("se è collegato ad Atti, la conferma dice quanti perderanno il collegament
     consentita: true,
     avviso: "4 Atti perderanno il collegamento con questo Settore.",
   });
-});
-
-test("un id valido è un intero positivo che sta in un int4", () => {
-  assert.equal(idSettore("7"), 7);
-  assert.equal(idSettore("2147483647"), 2147483647);
-});
-
-test("id non numerico, zero, negativo, decimale o troppo grande è rifiutato", () => {
-  for (const g of ["abc", "", "0", "-1", "1.5", "2147483648", "1e3", " ", null, undefined]) {
-    assert.equal(idSettore(g), null, String(g));
-  }
 });

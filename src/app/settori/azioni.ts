@@ -13,10 +13,10 @@ import {
 import {
   type CampiSettore,
   type EsitoSalvataggio,
-  idSettore,
   validaSettore,
   valutaEliminazione,
 } from "@/lib/settore";
+import { idIntero } from "@/lib/id";
 
 export type StatoModulo =
   | {
@@ -71,7 +71,7 @@ export async function aggiornaSettoreAzione(
   _stato: StatoModulo,
   formData: FormData,
 ): Promise<StatoModulo> {
-  const id = idSettore(formData.get("id"));
+  const id = idIntero(formData.get("id"));
   await richiediSessione(id ? `/settori/${id}/modifica` : "/settori");
   const esito = leggiCampi(formData);
   if (id === null) return { errore: NON_TROVATO, valori: esito.valori };
@@ -91,7 +91,7 @@ export async function eliminaSettoreAzione(
   _stato: StatoModulo,
   formData: FormData,
 ): Promise<StatoModulo> {
-  const id = idSettore(formData.get("id"));
+  const id = idIntero(formData.get("id"));
   await richiediSessione(id ? `/settori/${id}/elimina` : "/settori");
   if (id === null) return { errore: NON_TROVATO };
   const decisione = valutaEliminazione(await usiSettore(id));
