@@ -257,6 +257,10 @@ export function FormAtto({ azione, id, iniziali, settori, temi, atti, etichettaI
         </Campo>
       </div>
 
+      <Campo nome="recepimentoEntro" etichetta="Recepimento entro (direttive UE)" errore={errore("recepimentoEntro")}>
+        <Input id="recepimentoEntro" name="recepimentoEntro" type="date" defaultValue={valori.recepimentoEntro} aria-invalid={!!errore("recepimentoEntro")} />
+      </Campo>
+
       <Campo nome="summary" etichetta="Summary" errore={errore("summary")}><Textarea id="summary" name="summary" defaultValue={valori.summary} rows={3} /></Campo>
       <Campo nome="urlTesto" etichetta="Link al testo ufficiale" errore={errore("urlTesto")}><Input id="urlTesto" name="urlTesto" type="url" defaultValue={valori.urlTesto} placeholder="https://…" /></Campo>
 

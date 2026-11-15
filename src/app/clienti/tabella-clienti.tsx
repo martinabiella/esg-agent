@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { NormaDelCliente } from "@/db/applicabilita";
 import type { ClienteConSettori } from "@/db/clienti";
 import { formattaFatturato, type ValoriModulo } from "@/lib/cliente";
 import { elencoPaesi, nomePaese } from "@/lib/paesi";
@@ -30,6 +31,7 @@ import {
 } from "./azioni";
 import { EliminaCliente } from "./elimina-cliente";
 import { FormCliente } from "./form-cliente";
+import { NormativeCliente } from "./normative-cliente";
 import type { Voce } from "./selezione-multipla";
 
 const MESSAGGI: Record<EsitoOperazione, string> = {
@@ -96,7 +98,13 @@ function Dato({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function DettaglioCliente({ cliente }: { cliente: ClienteConSettori }) {
+function DettaglioCliente({
+  cliente,
+  normative,
+}: {
+  cliente: ClienteConSettori;
+  normative: NormaDelCliente[];
+}) {
   const fatturato = cliente.fatturato === null ? null : formattaFatturato(cliente.fatturato);
   const note = cliente.note?.trim();
   const paesi = cliente.paesi ?? [];
@@ -132,6 +140,11 @@ function DettaglioCliente({ cliente }: { cliente: ClienteConSettori }) {
             )}
           </dd>
         </div>
+        <NormativeCliente
+          clienteId={cliente.id}
+          ragioneSociale={cliente.ragioneSociale}
+          normative={normative}
+        />
       </dl>
     </div>
   );
@@ -139,9 +152,11 @@ function DettaglioCliente({ cliente }: { cliente: ClienteConSettori }) {
 
 export function TabellaClienti({
   clienti,
+  normative,
   settori,
 }: {
   clienti: ClienteConSettori[];
+  normative: Record<number, NormaDelCliente[]>;
   settori: { id: number; nome: string }[];
 }) {
   const [vista, setVista] = useState<Vista | null>(null);
@@ -310,7 +325,7 @@ export function TabellaClienti({
                   <AlertDescription>{MESSAGGI[esito]}</AlertDescription>
                 </Alert>
               )}
-              <DettaglioCliente cliente={selezionato} />
+              <DettaglioCliente cliente={selezionato} normative={normative[selezionato.id] ?? []} />
               <div className="flex items-center gap-2 border-t p-4">
                 <Button
                   onClick={() => {

@@ -40,6 +40,7 @@ export type ValoriModuloAtto = {
   dataStato: string;
   summary: string;
   urlTesto: string;
+  recepimentoEntro: string;
   tuttiISettori: boolean;
   settori: string[];
   temi: string[];
@@ -62,6 +63,7 @@ export type CampiAtto = {
   dataStato: string;
   summary: string;
   urlTesto: string | null;
+  recepimentoEntro: string | null;
   tuttiISettori: boolean;
   settori: number[];
   temi: number[];
@@ -189,6 +191,7 @@ function valoriGrezzi(input: Partial<ValoriModuloAtto> & { soglieJson?: string }
     dataStato: testo(input.dataStato),
     summary: testo(input.summary),
     urlTesto: testo(input.urlTesto),
+    recepimentoEntro: testo(input.recepimentoEntro),
     tuttiISettori: input.tuttiISettori === true,
     settori: elenco(input.settori),
     temi: elenco(input.temi),
@@ -217,6 +220,10 @@ export function validaAtto(input: Partial<ValoriModuloAtto> & { soglieJson?: str
   else if (!validazioneTipo.ok) errori.tipo = validazioneTipo.errore;
   if (!STATI.includes(valori.stato as typeof STATI[number])) errori.stato = "Lo Stato è obbligatorio.";
   if (!dataValida(valori.dataStato)) errori.dataStato = "Indica una data valida.";
+  const recepimentoEntro = valori.recepimentoEntro.trim() || null;
+  if (recepimentoEntro !== null && !dataValida(recepimentoEntro)) {
+    errori.recepimentoEntro = "Indica una data valida.";
+  }
 
   let urlTesto: string | null = null;
   if (valori.urlTesto.trim()) {
@@ -260,6 +267,7 @@ export function validaAtto(input: Partial<ValoriModuloAtto> & { soglieJson?: str
       dataStato: valori.dataStato,
       summary: valori.summary.trim(),
       urlTesto,
+      recepimentoEntro,
       tuttiISettori: valori.tuttiISettori,
       settori,
       temi,

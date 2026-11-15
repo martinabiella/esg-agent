@@ -231,7 +231,7 @@ function datiAtto(valori: CampiAtto) {
     ${valori.tipo}::tipo_atto, ${valori.stato}::stato, ${valori.summary}, ${valori.urlTesto},
     ${valori.criteriSoglie ? JSON.stringify(valori.criteriSoglie) : null}::jsonb,
     ${valori.criteriTesto}, true, ${valori.tuttiISettori}, ${valori.nonRilevante},
-    'persona'::provenienza, now()`;
+    ${valori.recepimentoEntro}::date, 'persona'::provenienza, now()`;
 }
 
 export type EsitoScritturaAtto =
@@ -257,7 +257,7 @@ export async function creaAtto(valori: CampiAtto): Promise<EsitoScritturaAtto> {
         INSERT INTO atto_normativo
           (titolo, identificativo_ufficiale, giurisdizione, tipo, stato, summary, url_testo,
            criteri_soglie, criteri_testo, criteri_confermati, tutti_i_settori, non_rilevante,
-           provenienza_contenuti, aggiornato_il)
+           recepimento_entro, provenienza_contenuti, aggiornato_il)
         VALUES (${datiAtto(valori)})
         RETURNING id
       ), inserisci_settori AS (
@@ -313,6 +313,7 @@ export async function aggiornaAtto(id: number, valori: CampiAtto): Promise<Esito
             criteri_soglie = ${valori.criteriSoglie ? JSON.stringify(valori.criteriSoglie) : null}::jsonb,
             criteri_testo = ${valori.criteriTesto}, criteri_confermati = true,
             tutti_i_settori = ${valori.tuttiISettori}, non_rilevante = ${valori.nonRilevante},
+            recepimento_entro = ${valori.recepimentoEntro}::date,
             provenienza_contenuti = 'persona'::provenienza, aggiornato_il = now()
         FROM precedente
         WHERE atto.id = precedente.id

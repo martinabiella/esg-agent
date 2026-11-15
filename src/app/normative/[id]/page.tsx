@@ -74,6 +74,11 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
         {atto.nonRilevante && <Badge variant="destructive">Non rilevante</Badge>}
       </p>
       <p className="mt-2 text-sm text-muted-foreground">Contenuti: {provenienza}</p>
+      {atto.recepimentoEntro && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Recepimento entro il {dataIt(atto.recepimentoEntro)}
+        </p>
+      )}
       {atto.urlTesto && (
         <p className="mt-2 text-sm">
           <a href={atto.urlTesto} target="_blank" rel="noreferrer" className="underline">
