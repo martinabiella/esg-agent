@@ -353,3 +353,11 @@ export async function aggiornaAtto(id: number, valori: CampiAtto): Promise<Esito
     throw e;
   }
 }
+
+export async function eliminaAtto(id: number): Promise<EsitoScritturaAtto> {
+  const righe = await db
+    .delete(attoNormativo)
+    .where(eq(attoNormativo.id, id))
+    .returning({ id: attoNormativo.id });
+  return righe.length ? { ok: true, id } : { ok: false, motivo: "non_trovato" };
+}

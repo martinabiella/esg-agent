@@ -7,6 +7,7 @@ import { elencoSettori } from "@/db/settori";
 import { stato } from "@/db/schema";
 import { filtriAttiDaParams } from "@/lib/filtri-atti";
 import { etichettaStato } from "@/lib/etichette";
+import { Esito } from "./esito";
 import { TabellaNormative } from "./tabella-normative";
 
 export const metadata = { title: "Normative · Monitoraggio ESG" };
@@ -18,11 +19,22 @@ export default function NormativePage(props: PageProps<"/normative">) {
         <h1 className="text-2xl font-semibold">Normative</h1>
         <Button render={<Link href="/normative/nuovo" />}>Nuovo Atto</Button>
       </div>
+      <Suspense>
+        <EsitoDaIndirizzo searchParams={props.searchParams} />
+      </Suspense>
       <Suspense fallback={<Caricamento />}>
         <Contenuto searchParams={props.searchParams} />
       </Suspense>
     </div>
   );
+}
+
+async function EsitoDaIndirizzo({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return <Esito esito={(await searchParams).esito} />;
 }
 
 const selectClasse =
