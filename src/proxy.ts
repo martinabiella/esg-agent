@@ -1,7 +1,10 @@
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 
-const protezione = auth.middleware({ loginUrl: "/accedi" });
+const protezione = auth.middleware({
+  loginUrl: "/accedi",
+  publicRoutes: ["/reimposta"],
+});
 
 export default async function proxy(request: NextRequest) {
   const risposta = await protezione(request);
