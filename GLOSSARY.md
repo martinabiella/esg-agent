@@ -65,7 +65,7 @@ Indicazione dell'origine di un contenuto di un Atto normativo: *dalla fonte uffi
 _Avoid_: Fonte, stato di verifica
 
 **Avviso di conferma**:
-Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona, più le Notizie che suggeriscono modifiche a Atti esistenti o discutono nuove normative. Non blocca nulla.
+Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona, più le Notizie che suggeriscono modifiche a Atti esistenti o discutono nuove normative. Una Notizia esce dall'avviso quando una persona la segna come controllata. Non blocca nulla.
 _Avoid_: Notifica, coda di revisione, task
 
 **Fonte**:
