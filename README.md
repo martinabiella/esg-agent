@@ -35,6 +35,12 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
+## Componenti UI
+
+I componenti riutilizzabili dell'interfaccia sono in `src/components/ui/` e seguono la convenzione [shadcn/ui](https://ui.shadcn.com/). Per aggiungere un componente usare il CLI shadcn, per esempio `npx shadcn add dialog`, poi adattare il componente ai testi e alle esigenze dell'app.
+
+Usare questi componenti per i controlli interattivi e gli stati condivisi. Le classi Tailwind locali restano appropriate per il layout specifico di una pagina; non serve creare un componente per ogni elemento HTML.
+
 ## Accesso (Neon Auth)
 
 Tutta l'app è dietro login (Neon Auth, Managed Better Auth, email e password). Non c'è registrazione pubblica: gli utenti si creano dal pannello Neon (progetto `esg-agent` → Auth → Users). Il recupero password si gestisce dal pannello.

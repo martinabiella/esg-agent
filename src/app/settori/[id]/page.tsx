@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Caricamento } from "@/app/caricamento";
 import { attiDelSettore } from "@/db/atti";
 import { settoreDaParams } from "../trova-da-params";
@@ -39,29 +41,29 @@ async function Scheda({
       <Esito esito={(await searchParams).esito} />
       <div className="mt-2 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">{settore.nome}</h1>
-        <div className="flex gap-3 text-sm">
-          <Link href={`/settori/${id}/modifica`} className="rounded border px-3 py-2 font-medium">
+        <div className="flex gap-2">
+          <Button variant="outline" render={<Link href={`/settori/${id}/modifica`} />}>
             Modifica
-          </Link>
-          <Link href={`/settori/${id}/elimina`} className="rounded border border-red-600 px-3 py-2 font-medium text-red-600">
+          </Button>
+          <Button variant="destructive" render={<Link href={`/settori/${id}/elimina`} />}>
             Elimina
-          </Link>
+          </Button>
         </div>
       </div>
-      {settore.descrizione && <p className="mt-2 max-w-2xl">{settore.descrizione}</p>}
+      {settore.descrizione && <p className="mt-2 max-w-2xl text-muted-foreground">{settore.descrizione}</p>}
 
       <h2 className="mt-8 text-lg font-semibold">Normative che riguardano il Settore</h2>
       {atti.length === 0 ? (
-        <p className="mt-2 text-sm opacity-70">Nessun Atto normativo collegato.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Nessun Atto normativo collegato.</p>
       ) : (
         <ul className="mt-2 divide-y border-y">
           {atti.map((a) => (
             <li key={a.id} className="py-3">
               <span className="font-medium">{a.titolo}</span>
               <p className="mt-1 text-sm opacity-70">
-                {etichettaGiurisdizione[a.giurisdizione]} ·{" "}
-                {etichettaTipoAtto[a.tipo]} ·{" "}
-                {etichettaStato[a.stato]}
+                <Badge variant="secondary">{etichettaGiurisdizione[a.giurisdizione]}</Badge>{" "}
+                <Badge variant="outline">{etichettaTipoAtto[a.tipo]}</Badge>{" "}
+                <Badge>{etichettaStato[a.stato]}</Badge>
                 {a.tuttiISettori && " · tutti i Settori"}
               </p>
             </li>

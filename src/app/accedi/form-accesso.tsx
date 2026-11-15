@@ -1,6 +1,10 @@
 "use client";
 
 import { useActionState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { accedi } from "./azioni";
 
 export function FormAccesso({ dopo }: { dopo: string }) {
@@ -8,38 +12,34 @@ export function FormAccesso({ dopo }: { dopo: string }) {
   return (
     <form action={azione} className="mt-6 flex flex-col gap-4">
       <input type="hidden" name="dopo" value={dopo} />
-      <label className="flex flex-col gap-1 text-sm">
-        Email
-        <input
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
           name="email"
           type="email"
           autoComplete="username"
           required
-          className="border rounded px-3 py-2"
         />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Password
-        <input
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="password">Password</Label>
+        <Input
+          id="password"
           name="password"
           type="password"
           autoComplete="current-password"
           required
-          className="border rounded px-3 py-2"
         />
-      </label>
+      </div>
       {stato?.errore && (
-        <p role="alert" className="text-sm text-red-600">
-          {stato.errore}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{stato.errore}</AlertDescription>
+        </Alert>
       )}
-      <button
-        type="submit"
-        disabled={inCorso}
-        className="rounded border px-3 py-2 text-sm font-medium disabled:opacity-50"
-      >
+      <Button type="submit" disabled={inCorso} className="w-full">
         {inCorso ? "Accesso in corso…" : "Accedi"}
-      </button>
+      </Button>
     </form>
   );
 }

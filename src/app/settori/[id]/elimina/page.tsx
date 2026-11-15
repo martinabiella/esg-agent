@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Caricamento } from "@/app/caricamento";
 import { usiSettore } from "@/db/settori";
 import { valutaEliminazione } from "@/lib/settore";
@@ -28,9 +29,9 @@ async function Conferma({ params }: { params: Promise<{ id: string }> }) {
       {decisione.consentita ? (
         decisione.avviso && <p className="mt-2 text-sm">{decisione.avviso}</p>
       ) : (
-        <p role="alert" className="mt-2 text-sm text-red-600">
-          {decisione.messaggio}
-        </p>
+        <Alert variant="destructive" className="mt-4">
+          <AlertDescription>{decisione.messaggio}</AlertDescription>
+        </Alert>
       )}
       <FormElimina id={id} bloccato={!decisione.consentita} />
     </>

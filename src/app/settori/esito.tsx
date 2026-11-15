@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { EsitoSalvataggio } from "@/lib/settore";
 
 const MESSAGGI: Record<EsitoSalvataggio, string> = {
@@ -11,8 +12,8 @@ export function Esito({ esito }: { esito: string | string[] | undefined }) {
   const messaggio = typeof esito === "string" ? MESSAGGI[esito as EsitoSalvataggio] : undefined;
   if (!messaggio) return null;
   return (
-    <p role="status" className="mt-4 rounded border border-green-600 px-3 py-2 text-sm text-green-700">
-      {messaggio}
-    </p>
+    <Alert role="status" className="mt-4 border-green-600 text-green-700">
+      <AlertDescription>{messaggio}</AlertDescription>
+    </Alert>
   );
 }
