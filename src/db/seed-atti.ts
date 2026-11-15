@@ -112,7 +112,7 @@ async function main() {
   const { inArray } = await import("drizzle-orm");
 
   const nomiTemi = [...new Set(ATTI.flatMap((a) => a.temi))];
-  await db.insert(s.tema).values(nomiTemi.map((nome) => ({ nome }))).onConflictDoNothing({ target: s.tema.nome });
+  await db.insert(s.tema).values(nomiTemi.map((nome) => ({ nome }))).onConflictDoNothing();
   const temi = await db.select().from(s.tema).where(inArray(s.tema.nome, nomiTemi));
   const settori = await db.select().from(s.settore);
 

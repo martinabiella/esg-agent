@@ -54,10 +54,15 @@ export const settore = pgTable(
   (t) => [uniqueIndex("settore_nome_lower_idx").on(sql`lower(${t.nome})`)],
 );
 
-export const tema = pgTable("tema", {
-  id: serial("id").primaryKey(),
-  nome: text("nome").notNull().unique(),
-});
+export const tema = pgTable(
+  "tema",
+  {
+    id: serial("id").primaryKey(),
+    nome: text("nome").notNull(),
+  },
+  // Nome unico senza distinguere maiuscole e minuscole.
+  (t) => [uniqueIndex("tema_nome_lower_idx").on(sql`lower(${t.nome})`)],
+);
 
 export const attoNormativo = pgTable("atto_normativo", {
   id: serial("id").primaryKey(),
