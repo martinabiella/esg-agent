@@ -27,7 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <header className="flex items-center gap-6 border-b px-6 py-3">
+        <header className="flex flex-wrap items-center gap-3 border-b px-6 py-3">
           <Link href="/" className="font-semibold hover:underline">
             Monitoraggio ESG
           </Link>

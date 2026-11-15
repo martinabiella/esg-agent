@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Caricamento } from "@/app/caricamento";
 import { FormReimposta } from "./form-reimposta";
 
@@ -8,12 +9,16 @@ type Parametri = Promise<{ token?: string | string[] }>;
 
 export default function PaginaReimposta({ searchParams }: { searchParams: Parametri }) {
   return (
-    <div className="max-w-sm mx-auto mt-12">
-      <h1 className="text-2xl font-semibold">Imposta la password</h1>
-      <Suspense fallback={<Caricamento />}>
-        <Modulo searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <Card className="mx-auto mt-12 max-w-sm">
+      <CardHeader>
+        <CardTitle>Imposta la password</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Suspense fallback={<Caricamento />}>
+          <Modulo searchParams={searchParams} />
+        </Suspense>
+      </CardContent>
+    </Card>
   );
 }
 

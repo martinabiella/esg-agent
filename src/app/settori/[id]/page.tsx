@@ -39,9 +39,9 @@ async function Scheda({
   return (
     <>
       <Esito esito={(await searchParams).esito} />
-      <div className="mt-2 flex items-center justify-between gap-4">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">{settore.nome}</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" render={<Link href={`/settori/${id}/modifica`} />}>
             Modifica
           </Button>

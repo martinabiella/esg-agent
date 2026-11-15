@@ -41,6 +41,8 @@ I componenti riutilizzabili dell'interfaccia sono in `src/components/ui/` e segu
 
 Usare questi componenti per i controlli interattivi e gli stati condivisi. Le classi Tailwind locali restano appropriate per il layout specifico di una pagina; non serve creare un componente per ogni elemento HTML.
 
+Per le tabelle con filtri, ordinamento o paginazione complessi si potrà valutare TanStack Table in una modifica separata; non fa parte della base UI.
+
 ## Accesso (Neon Auth)
 
 Tutta l'app è dietro login (Neon Auth, Managed Better Auth, email e password). Non c'è registrazione pubblica: gli utenti si creano dal pannello Neon (progetto `esg-agent` → Auth → Users). Il recupero password si gestisce dal pannello.
