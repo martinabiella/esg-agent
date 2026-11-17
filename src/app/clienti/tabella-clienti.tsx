@@ -2,6 +2,7 @@
 
 import { useCallback, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
 import type { NormaDelCliente } from "@/db/applicabilita";
 import type { ClienteConSettori } from "@/db/clienti";
 import { formattaFatturato, type ValoriModulo } from "@/lib/cliente";
+import { idIntero } from "@/lib/id";
 import { elencoPaesi, nomePaese } from "@/lib/paesi";
 import {
   aggiornaClienteAzione,
@@ -159,13 +161,27 @@ export function TabellaClienti({
   normative: Record<number, NormaDelCliente[]>;
   settori: { id: number; nome: string }[];
 }) {
-  const [vista, setVista] = useState<Vista | null>(null);
-  const [aperto, setAperto] = useState(false);
+  const idCollegato = idIntero(useSearchParams().get("cliente"));
+  const [vistaLocale, setVista] = useState<Vista | null>(null);
+  const [apertoLocale, setAperto] = useState(false);
   const [esito, setEsito] = useState<EsitoOperazione | null>(null);
 
+  const vista: Vista | null = vistaLocale ?? (
+    idCollegato === null ? null : { tipo: "dettaglio", id: idCollegato }
+  );
   const vociSettori: Voce[] = settori.map((s) => ({ value: String(s.id), label: s.nome }));
   const selezionato =
     vista && vista.tipo !== "nuovo" ? clienti.find((c) => c.id === vista.id) : undefined;
+  const aperto = vistaLocale === null ? selezionato !== undefined : apertoLocale;
+
+  const chiudi = useCallback(() => {
+    setAperto(false);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("cliente")) {
+      url.searchParams.delete("cliente");
+      window.history.replaceState(null, "", url);
+    }
+  }, []);
 
   function mostra(nuova: Vista) {
     setVista(nuova);
@@ -184,8 +200,8 @@ export function TabellaClienti({
 
   const dopoEliminazione = useCallback(() => {
     setEsito("eliminato");
-    setAperto(false);
-  }, []);
+    chiudi();
+  }, [chiudi]);
 
   return (
     <>
@@ -275,7 +291,11 @@ export function TabellaClienti({
         </Table>
       </div>
 
-      <Drawer open={aperto} onOpenChange={setAperto} swipeDirection="right">
+      <Drawer
+        open={aperto}
+        onOpenChange={(open) => (open ? setAperto(true) : chiudi())}
+        swipeDirection="right"
+      >
         <DrawerContent>
           {vista?.tipo === "nuovo" && (
             <>
