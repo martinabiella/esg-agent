@@ -44,6 +44,19 @@ export async function elencoClienti(): Promise<ClienteConSettori[]> {
   return aggiungiSettori(clienti, collegamenti);
 }
 
+export async function clientiDelSettore(settoreId: number) {
+  return db
+    .select({
+      id: cliente.id,
+      ragioneSociale: cliente.ragioneSociale,
+      attivitaSpecifica: cliente.attivitaSpecifica,
+    })
+    .from(clienteSettore)
+    .innerJoin(cliente, eq(clienteSettore.clienteId, cliente.id))
+    .where(eq(clienteSettore.settoreId, settoreId))
+    .orderBy(asc(cliente.ragioneSociale), asc(cliente.id));
+}
+
 // ---- Scritture ----
 // Il driver neon-http non ha transazioni interattive: Cliente e collegamenti ai
 // Settori viaggiano in un'unica richiesta atomica (batch, o una sola istruzione).

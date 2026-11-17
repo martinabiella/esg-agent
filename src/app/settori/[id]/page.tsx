@@ -2,8 +2,17 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Caricamento } from "@/app/caricamento";
 import { attiDelSettore } from "@/db/atti";
+import { clientiDelSettore } from "@/db/clienti";
 import { settoreDaParams } from "../trova-da-params";
 import { Esito } from "../esito";
 import { EliminaSettore } from "../elimina-settore";
@@ -35,11 +44,15 @@ async function Scheda({
 }) {
   const settore = await settoreDaParams(params);
   const id = settore.id;
-  const atti = await attiDelSettore(id);
+  const [atti, clienti, { esito }] = await Promise.all([
+    attiDelSettore(id),
+    clientiDelSettore(id),
+    searchParams,
+  ]);
 
   return (
     <>
-      <Esito esito={(await searchParams).esito} />
+      <Esito esito={esito} />
       <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">{settore.nome}</h1>
         <div className="flex flex-wrap gap-2">
@@ -51,26 +64,84 @@ async function Scheda({
       </div>
       {settore.descrizione && <p className="mt-2 max-w-2xl text-muted-foreground">{settore.descrizione}</p>}
 
-      <h2 className="mt-8 text-lg font-semibold">Normative che riguardano il Settore</h2>
-      {atti.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">Nessun Atto normativo collegato.</p>
-      ) : (
-        <ul className="mt-2 divide-y border-y">
-          {atti.map((a) => (
-            <li key={a.id} className="py-3">
-              <Link href={`/normative/${a.id}`} className="font-medium hover:underline">
-                {a.titolo}
-              </Link>
-              <p className="mt-1 text-sm opacity-70">
-                <Badge variant="secondary">{etichettaGiurisdizione[a.giurisdizione]}</Badge>{" "}
-                <Badge variant="outline">{etichettaTipoAtto[a.tipo]}</Badge>{" "}
-                <Badge>{etichettaStato[a.stato]}</Badge>
-                {a.tuttiISettori && " · tutti i Settori"}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
+      <h2 id="normative-settore" className="mt-8 text-lg font-semibold">
+        Normative che riguardano il Settore
+      </h2>
+      <div className="mt-2 rounded-lg border">
+        <Table aria-labelledby="normative-settore">
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">Titolo</TableHead>
+              <TableHead scope="col">Giurisdizione</TableHead>
+              <TableHead scope="col">Tipo di atto</TableHead>
+              <TableHead scope="col">Stato</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {atti.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-muted-foreground">
+                  Nessun Atto normativo collegato.
+                </TableCell>
+              </TableRow>
+            ) : (
+              atti.map((atto) => (
+                <TableRow key={atto.id}>
+                  <TableCell className="whitespace-normal">
+                    <Link href={`/normative/${atto.id}`} className="font-medium hover:underline">
+                      {atto.titolo}
+                    </Link>
+                    {atto.tuttiISettori && (
+                      <div className="mt-1 text-muted-foreground">Tutti i Settori</div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{etichettaGiurisdizione[atto.giurisdizione]}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{etichettaTipoAtto[atto.tipo]}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge>{etichettaStato[atto.stato]}</Badge>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <h2 id="clienti-settore" className="mt-8 text-lg font-semibold">
+        Clienti che operano nel Settore
+      </h2>
+      <div className="mt-2 rounded-lg border">
+        <Table aria-labelledby="clienti-settore">
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">Ragione sociale</TableHead>
+              <TableHead scope="col">Attività specifica</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {clienti.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={2} className="text-muted-foreground">
+                  Nessun Cliente opera in questo Settore.
+                </TableCell>
+              </TableRow>
+            ) : (
+              clienti.map((cliente) => (
+                <TableRow key={cliente.id}>
+                  <TableCell className="font-medium whitespace-normal">{cliente.ragioneSociale}</TableCell>
+                  <TableCell className="whitespace-normal text-muted-foreground">
+                    {cliente.attivitaSpecifica}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </>
   );
 }
