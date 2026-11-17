@@ -45,7 +45,7 @@ Per le tabelle con filtri, ordinamento o paginazione complessi si potrà valutar
 
 ## Accesso (Neon Auth)
 
-Tutta l'app è dietro login (Neon Auth, Managed Better Auth, email e password). Non c'è registrazione pubblica: gli utenti si creano dal pannello Neon (progetto `esg-agent` → Auth → Users). Il recupero password si gestisce dal pannello.
+L’app richiede l’accesso con email e password (Neon Auth, Managed Better Auth). Mantieni disabilitata la registrazione pubblica nelle impostazioni di Neon Auth. Crea gli utenti e avvia il recupero password dal pannello Neon (progetto `esg-agent` → Auth → Users).
 
 Variabili d'ambiente (in `.env.local`, mai nel repository):
 
@@ -57,4 +57,8 @@ Variabili d'ambiente (in `.env.local`, mai nel repository):
 
 Per le scritture (azioni server e rotte API) usare `utenteRichiesto()` da `@/lib/auth`: restituisce l'utente corrente o lancia `NonAutenticatoError`.
 
-Il proxy (`src/proxy.ts`) reindirizza a `/accedi` chi non è autenticato, ma non basta: ogni scrittura deve verificare la sessione lato server.
+Il proxy (`src/proxy.ts`) rimanda a `/auth/sign-in` chi non ha una sessione. Ogni scrittura verifica comunque la sessione lato server.
+
+Better Auth UI fornisce i moduli di accesso e reset password, la vista di uscita e il menu utente. I vecchi link `/accedi` e `/reimposta` funzionano ancora.
+
+I componenti del registro shadcn sono in `src/components/auth/`. Se li aggiorni, mantieni nascosti i link di registrazione. Allinea `better-auth` alla versione compatibile con `@neon/auth`.

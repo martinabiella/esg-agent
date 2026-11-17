@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Suspense } from "react";
 import { MenuUtente } from "./menu-utente";
+import { ProviderAuth } from "./provider-auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,15 +28,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <header className="flex flex-wrap items-center gap-3 border-b px-6 py-3">
-          <Link href="/" className="font-semibold hover:underline">
-            Monitoraggio ESG
-          </Link>
-          <Suspense>
-            <MenuUtente />
-          </Suspense>
-        </header>
-        <main className="flex-1 px-6 py-6">{children}</main>
+        <ProviderAuth>
+          <header className="flex flex-wrap items-center gap-3 border-b px-6 py-3">
+            <Link href="/" className="font-semibold hover:underline">
+              Monitoraggio ESG
+            </Link>
+            <Suspense>
+              <MenuUtente />
+            </Suspense>
+          </header>
+          <main className="flex-1 px-6 py-6">{children}</main>
+        </ProviderAuth>
       </body>
     </html>
   );
