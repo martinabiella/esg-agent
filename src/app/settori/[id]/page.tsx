@@ -132,7 +132,14 @@ async function Scheda({
             ) : (
               clienti.map((cliente) => (
                 <TableRow key={cliente.id}>
-                  <TableCell className="font-medium whitespace-normal">{cliente.ragioneSociale}</TableCell>
+                  <TableCell className="whitespace-normal">
+                    <Link
+                      href={{ pathname: "/clienti", query: { cliente: cliente.id } }}
+                      className="font-medium hover:underline"
+                    >
+                      {cliente.ragioneSociale}
+                    </Link>
+                  </TableCell>
                   <TableCell className="whitespace-normal text-muted-foreground">
                     {cliente.attivitaSpecifica}
                   </TableCell>
