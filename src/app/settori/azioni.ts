@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { utenteRichiesto } from "@/lib/auth";
 import { NonAutenticatoError } from "@/lib/utente-richiesto";
+import { PERCORSO_ACCESSO } from "@/lib/redirect-sicuro";
 import {
   aggiornaSettore,
   creaSettore,
@@ -32,7 +33,7 @@ async function richiediSessione(dopo: string) {
     await utenteRichiesto();
   } catch (e) {
     if (e instanceof NonAutenticatoError) {
-      redirect(`/accedi?dopo=${encodeURIComponent(dopo)}`);
+      redirect(`${PERCORSO_ACCESSO}?redirectTo=${encodeURIComponent(dopo)}`);
     }
     throw e;
   }
