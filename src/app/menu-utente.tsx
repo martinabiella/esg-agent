@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
-import { esci } from "./accedi/azioni";
+import { UserButton } from "@/components/auth/user/user-button";
 
 const voci = [
   { href: "/normative", label: "Normative" },
@@ -11,6 +12,7 @@ const voci = [
 ];
 
 export async function MenuUtente() {
+  await connection();
   const { data: sessione } = await auth.getSession();
   if (!sessione?.user) return null;
   return (
@@ -22,11 +24,7 @@ export async function MenuUtente() {
           </Button>
         ))}
       </nav>
-      <form action={esci} className="ml-auto">
-        <Button type="submit" variant="ghost" size="sm">
-          Esci
-        </Button>
-      </form>
+      <UserButton className="ml-auto" size="icon" align="end" hideSettings />
     </>
   );
 }
