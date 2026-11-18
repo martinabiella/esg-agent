@@ -53,11 +53,11 @@ Decisione manuale, con motivazione, che sostituisce l'Applicabilità calcolata p
 _Avoid_: Eccezione, forzatura
 
 **Notizia**:
-Un singolo articolo (titolo, fonte, data, URL, riassunto) collegato a zero, uno o più Atti normativi. È solo un riferimento: non modifica mai un Atto. Se segnala una nuova normativa o un aggiornamento, una persona controlla a mano l'Atto e lo modifica.
+Un singolo articolo (titolo, fonte, data, URL, riassunto) collegato a zero, uno o più Atti normativi. È solo un riferimento: non modifica mai un Atto. Può *segnalare una novità* (suggerisce modifiche a un Atto esistente o discute una nuova normativa): in quel caso entra nell'Avviso di conferma e una persona controlla a mano l'Atto e lo modifica. Se la normativa discussa non è ancora nel catalogo e non ha un identificativo ufficiale, una persona può creare l'Atto a partire dalla Notizia.
 _Avoid_: Articolo, news, feed
 
 **Novità**:
-Un cambiamento rilevato dall'agente (nuovo Atto, cambio di Stato, nuova Notizia collegata) pubblicato subito nel catalogo e mostrato in dashboard. Non richiede approvazione.
+Un cambiamento rilevato dall'agente (nuovo Atto, cambio di Stato, nuova Notizia collegata) pubblicato subito nel catalogo e mostrato in dashboard. Non richiede approvazione. Il cambio di Stato viene rilevato solo da una Fonte ufficiale.
 _Avoid_: Aggiornamento, alert, coda di revisione
 
 **Provenienza**:
@@ -65,13 +65,17 @@ Indicazione dell'origine di un contenuto di un Atto normativo: *dalla fonte uffi
 _Avoid_: Fonte, stato di verifica
 
 **Avviso di conferma**:
-Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona, più le Notizie che suggeriscono modifiche a Atti esistenti o discutono nuove normative. Una Notizia esce dall'avviso quando una persona la segna come controllata. Non blocca nulla.
+Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona, più i cambi di Stato rilevati dall'agente e le Notizie che segnalano una novità (modifiche a Atti esistenti o nuove normative, con la possibilità di creare l'Atto dalla Notizia). Una Notizia esce dall'avviso quando una persona la segna come controllata. Non blocca nulla.
 _Avoid_: Notifica, coda di revisione, task
 
 **Fonte**:
-Un sito o canale monitorato dall'agente, con un livello di affidabilità: ufficiale (fa fede per Stato e date) oppure editoriale (solo Notizie e scoperta). L'elenco è modificabile dagli utenti.
+Un sito o canale monitorato dall'agente, con un livello di affidabilità: ufficiale (fa fede per Stato e date) oppure editoriale (solo Notizie e scoperta). L'elenco è modificabile dagli utenti: l'agente non aggiunge Fonti da solo.
 _Avoid_: Sorgente, feed
 
 **Non rilevante**:
 Etichetta che una persona assegna a un Atto per escluderlo dalle viste normali e dall'Avviso di conferma. L'Atto resta consultabile in una lista dedicata e l'agente non lo ripropone.
 _Avoid_: Scartato, archiviato, ignorato
+
+**Ricerca**:
+Un'esecuzione dell'agente. *Per Fonte*: controlla una Fonte dell'elenco (monitora gli Atti esistenti e cerca Notizie e nuovi Atti) a ogni giro. *Per Tema*: cerca sul web, a partire da un Tema, normative e notizie non pubblicate dalle Fonti note.
+_Avoid_: Scansione, crawl, job
