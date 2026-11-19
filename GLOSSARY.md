@@ -53,7 +53,7 @@ Decisione manuale, con motivazione, che sostituisce l'Applicabilità calcolata p
 _Avoid_: Eccezione, forzatura
 
 **Notizia**:
-Un singolo articolo (titolo, fonte, data, URL, riassunto) collegato a zero, uno o più Atti normativi. È solo un riferimento: non modifica mai un Atto. Può *segnalare una novità* (suggerisce modifiche a un Atto esistente o discute una nuova normativa): in quel caso entra nell'Avviso di conferma e una persona controlla a mano l'Atto e lo modifica. Se la normativa discussa non è ancora nel catalogo e non ha un identificativo ufficiale, una persona può creare l'Atto a partire dalla Notizia.
+Un singolo articolo (titolo, chi l'ha pubblicato, data, URL, riassunto) collegato a zero, uno o più Atti normativi. È solo un riferimento: non modifica mai un Atto. Può *segnalare una novità* (suggerisce modifiche a un Atto esistente o discute una nuova normativa): in quel caso entra nell'Avviso di conferma e una persona controlla a mano l'Atto e lo modifica. Se la normativa discussa non è ancora nel catalogo e non ha un identificativo ufficiale, una persona può creare l'Atto a partire dalla Notizia.
 _Avoid_: Articolo, news, feed
 
 **Novità**:
@@ -69,7 +69,7 @@ Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti gen
 _Avoid_: Notifica, coda di revisione, task
 
 **Fonte**:
-Un sito o canale monitorato dall'agente, con un livello di affidabilità: ufficiale (fa fede per Stato e date) oppure editoriale (solo Notizie e scoperta). L'elenco è modificabile dagli utenti: l'agente non aggiunge Fonti da solo.
+Un sito o canale monitorato dall'agente, con un livello di affidabilità: ufficiale (fa fede per Stato e date) oppure editoriale (solo Notizie e scoperta). L'elenco è modificabile dagli utenti: l'agente non aggiunge Fonti da solo. L'*ultimo controllo* di una Fonte dipende dalla sua ultima Ricerca conclusa: *controllata* (completata), *non leggibile* (fallita), *saltata per tetto*, oppure *mai controllata* se non ci sono Ricerche dopo l'ultimo cambio di URL. Non è uno Stato. Non va confusa con chi ha pubblicato una Notizia (nell'app "Pubblicata da"), che è un testo libero.
 _Avoid_: Sorgente, feed
 
 **Non rilevante**:

@@ -1,5 +1,6 @@
 import type { giurisdizione, provenienza, stato } from "@/db/schema";
 import type { Applicabilita } from "./applicabilita";
+import type { ControlloFonte, TipoFonte } from "./fonte";
 import type { TipoAtto } from "./tipi-atto";
 
 export const etichettaGiurisdizione: Record<
@@ -40,6 +41,18 @@ export const etichettaProvenienza: Record<
   fonte_ufficiale: "Dalla fonte ufficiale",
   agente: "Generato dall'agente",
   persona: "Confermato da una persona",
+};
+
+export const etichettaTipoFonte: Record<TipoFonte, string> = {
+  ufficiale: "Ufficiale",
+  editoriale: "Editoriale",
+};
+
+export const etichettaControlloFonte: Record<ControlloFonte["esito"], string> = {
+  mai_controllata: "Mai controllata",
+  controllata: "Controllata",
+  non_leggibile: "Non leggibile",
+  saltata_per_tetto: "Saltata per tetto",
 };
 
 export const etichettaApplicabilita: Record<Applicabilita, string> = {

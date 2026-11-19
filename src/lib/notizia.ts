@@ -1,4 +1,5 @@
 import { idIntero } from "./id";
+import { urlHttpValido } from "./url";
 
 type ParametriNotizia = Record<string, string | string[] | undefined>;
 
@@ -46,16 +47,6 @@ export type EsitoNotizia =
 
 const ANNO_MINIMO = 1900;
 
-function urlHttpValido(testo: string): boolean {
-  if (/\s/.test(testo)) return false;
-  try {
-    const url = new URL(testo);
-    return (url.protocol === "http:" || url.protocol === "https:") && url.hostname !== "";
-  } catch {
-    return false;
-  }
-}
-
 // Data reale (YYYY-MM-DD) tra il 1900 e oggi.
 function dataPlausibile(testo: string, oggi: Date): boolean {
   const parti = /^(\d{4})-(\d{2})-(\d{2})$/.exec(testo);
@@ -82,7 +73,7 @@ export function validaNotizia(input: InputNotizia, oggi: Date = new Date()): Esi
   const titolo = grezzi.titolo.trim();
   if (!titolo) errori.titolo = "Il titolo è obbligatorio.";
   const fonte = grezzi.fonte.trim();
-  if (!fonte) errori.fonte = "La fonte è obbligatoria.";
+  if (!fonte) errori.fonte = "Indica chi ha pubblicato la Notizia.";
 
   const url = grezzi.url.trim();
   if (!url) {
