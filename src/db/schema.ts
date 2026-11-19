@@ -1,6 +1,8 @@
 import {
   boolean,
+  check,
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -64,6 +66,22 @@ export const tema = pgTable(
   (t) => [uniqueIndex("tema_nome_lower_idx").on(sql`lower(${t.nome})`)],
 );
 
+// ufficiale: fa fede per Stato e date. editoriale: solo Notizie e scoperta.
+export const tipoFonte = pgEnum("tipo_fonte", ["ufficiale", "editoriale"]);
+
+// Siti monitorati dall'agente. L'elenco lo gestiscono gli utenti: l'agente
+// non aggiunge Fonti da solo.
+export const fonte = pgTable("fonte", {
+  id: serial("id").primaryKey(),
+  nome: text("nome").notNull(),
+  url: text("url").notNull().unique(),
+  tipo: tipoFonte("tipo").notNull(),
+  // Quando cambia l'URL la Fonte riparte da "mai controllata": contano solo
+  // le Ricerche avviate dopo questa data.
+  urlModificatoIl: timestamp("url_modificato_il").notNull().defaultNow(),
+  creatoIl: timestamp("creato_il").notNull().defaultNow(),
+});
+
 export const attoNormativo = pgTable("atto_normativo", {
   id: serial("id").primaryKey(),
   titolo: text("titolo").notNull(),
@@ -86,6 +104,10 @@ export const attoNormativo = pgTable("atto_normativo", {
   provenienzaContenuti: provenienza("provenienza_contenuti")
     .notNull()
     .default("persona"),
+  // Fonte da cui l'agente ha scoperto l'Atto: null per gli Atti inseriti a mano.
+  fonteId: integer("fonte_id").references(() => fonte.id, { onDelete: "set null" }),
+  // Ultima volta che una Fonte ufficiale ha confermato lo Stato.
+  statoConfermatoIl: timestamp("stato_confermato_il"),
   creatoIl: timestamp("creato_il").notNull().defaultNow(),
   aggiornatoIl: timestamp("aggiornato_il").notNull().defaultNow(),
 });
@@ -196,6 +218,9 @@ export const notizia = pgTable("notizia", {
   provenienzaContenuti: provenienza("provenienza_contenuti")
     .notNull()
     .default("persona"),
+  // Suggerisce modifiche a un Atto esistente o discute una nuova normativa.
+  // Lo imposta solo l'agente.
+  segnalaNovita: boolean("segnala_novita").notNull().default(false),
   creatoIl: timestamp("creato_il").notNull().defaultNow(),
 });
 
@@ -210,4 +235,43 @@ export const notiziaAtto = pgTable(
       .references(() => attoNormativo.id, { onDelete: "cascade" }),
   },
   (t) => [primaryKey({ columns: [t.notiziaId, t.attoId] })],
+);
+
+// ---- Log delle Ricerche dell'agente (nessuna UI) ----
+
+export const tipoRicerca = pgEnum("tipo_ricerca", ["per_fonte", "per_tema"]);
+
+export const esitoRicerca = pgEnum("esito_ricerca", [
+  "in_corso",
+  "completata",
+  "fallita",
+  "saltata_per_tetto",
+]);
+
+// Una riga per Ricerca. Eliminando la Fonte o il Tema la riga resta come
+// storico, senza riferimento.
+export const esecuzioneRicerca = pgTable(
+  "esecuzione_ricerca",
+  {
+    id: serial("id").primaryKey(),
+    tipo: tipoRicerca("tipo").notNull(),
+    fonteId: integer("fonte_id").references(() => fonte.id, { onDelete: "set null" }),
+    temaId: integer("tema_id").references(() => tema.id, { onDelete: "set null" }),
+    // Assente per le Ricerche saltate per tetto, che non partono su Parallel.
+    parallelRunId: text("parallel_run_id").unique(),
+    avviataIl: timestamp("avviata_il").notNull().defaultNow(),
+    terminataIl: timestamp("terminata_il"),
+    esito: esitoRicerca("esito").notNull().default("in_corso"),
+    notizieCreate: integer("notizie_create").notNull().default(0),
+    attiCreati: integer("atti_creati").notNull().default(0),
+    errore: text("errore"),
+  },
+  (t) => [
+    // Una Ricerca per Fonte non ha un Tema e viceversa.
+    check(
+      "esecuzione_ricerca_riferimento_check",
+      sql`(${t.tipo} = 'per_fonte' AND ${t.temaId} IS NULL) OR (${t.tipo} = 'per_tema' AND ${t.fonteId} IS NULL)`,
+    ),
+    index("esecuzione_ricerca_fonte_idx").on(t.fonteId, t.avviataIl),
+  ],
 );
