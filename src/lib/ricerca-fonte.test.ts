@@ -469,3 +469,25 @@ test("elaboraWebhook: una Notizia che cita solo Atti Non rilevanti non segnala u
     ],
   );
 });
+
+test("elaboraWebhook: una norma citata solo per nome e non trovata non fa scattare la novità; con identificativo sì", async () => {
+  const { archivio, deps } = await ricercaAvviata({
+    notizie: [
+      notiziaOutput({ url: "https://eur-lex.europa.eu/per-nome", atti_citati: [citato(null, "EU Taxonomy", "ue")] }),
+      notiziaOutput({ url: "https://eur-lex.europa.eu/per-nome-agente", segnala_novita: true, atti_citati: [citato(null, "EU Taxonomy", "ue")] }),
+      notiziaOutput({ url: "https://eur-lex.europa.eu/con-identificativo", atti_citati: [citato("32024L1760", "CSDDD", "ue")] }),
+    ],
+  });
+  archivio.atti = CATALOGO;
+
+  await elaboraWebhook(eventoCompletato("trun_1"), deps);
+
+  assert.deepEqual(
+    archivio.notizie.map((n) => [n.url.split("/").pop(), n.segnalaNovita]),
+    [
+      ["per-nome", false],
+      ["per-nome-agente", true],
+      ["con-identificativo", true],
+    ],
+  );
+});

@@ -88,7 +88,7 @@ function istruzioni(fonte: FonteRicerca, dal: string): string {
     `Esamina «${fonte.nome}» (${fonte.url}), ${tipo}.`,
     `Elenca gli articoli, i comunicati e le pagine pubblicati da questa fonte dal ${dal} a oggi che riguardano normativa di sostenibilità dell'Unione europea o italiana: proposte, direttive, regolamenti, decisioni, leggi, decreti, disegni di legge, il loro iter, recepimenti, rinvii e modifiche.`,
     `Ignora i contenuti che non riguardano normativa di sostenibilità.`,
-    `Per ogni articolo riporta gli atti normativi citati, con l'identificativo ufficiale quando l'articolo lo indica.`,
+    `Per ogni articolo riporta gli atti normativi citati con il loro identificativo ufficiale (CELEX, COM, numero e anno), anche se l'articolo non lo scrive, purché tu ne sia certo. Non riportare come atti rapporti, consultazioni o documenti di lavoro.`,
   ].join("\n");
 }
 
@@ -188,11 +188,13 @@ function senzaDoppioni(notizie: readonly NotiziaTrovata[]): NotiziaTrovata[] {
   return notizie.filter((n) => !visti.has(n.url) && visti.add(n.url));
 }
 
-// Collega gli Atti riconosciuti con certezza. Un Atto citato ma assente dal
-// catalogo, o ambiguo, fa segnalare una novità: Parallel non conosce il
-// catalogo, quindi lo decide il codice. Un Atto Non rilevante non si collega e
-// non fa scattare la segnalazione; una Notizia che cita solo Atti Non rilevanti
-// non segnala mai una novità, così non entra nell'Avviso di conferma.
+// Collega gli Atti riconosciuti con certezza. Un Atto citato con identificativo
+// ufficiale ma assente dal catalogo, o un Atto ambiguo, fa segnalare una
+// novità: Parallel non conosce il catalogo, quindi lo decide il codice. Una
+// norma citata solo per nome e non trovata non basta: vale il giudizio
+// dell'agente. Un Atto Non rilevante non si collega e non fa scattare la
+// segnalazione; una Notizia che cita solo Atti Non rilevanti non segnala mai
+// una novità, così non entra nell'Avviso di conferma.
 // «Pubblicata da»: l'editore indicato dall'agente, altrimenti il nome della
 // Fonte (o, se manca anche quello, il dominio della Notizia).
 function notizieDaSalvare(
@@ -203,7 +205,9 @@ function notizieDaSalvare(
   return senzaDoppioni(notizie).map((n) => {
     const esiti = n.attiCitati.map((c) => trovaAttoCitato(c, atti));
     const collegati = esiti.flatMap((e) => (e.esito === "collegato" ? [e.attoId] : []));
-    const daControllare = esiti.some((e) => e.esito === "assente" || e.esito === "ambiguo");
+    const daControllare = esiti.some(
+      (e, i) => e.esito === "ambiguo" || (e.esito === "assente" && n.attiCitati[i].identificativoUfficiale !== null),
+    );
     const soloNonRilevanti = esiti.length > 0 && esiti.every((e) => e.esito === "non_rilevante");
     return {
       titolo: n.titolo,

@@ -18,7 +18,7 @@ const attoCitato = z
       .string()
       .nullable()
       .describe(
-        "Identificativo ufficiale dell'atto se l'articolo lo riporta (numero CELEX, numero COM, numero e anno di legge, decreto o DDL), altrimenti null",
+        "Identificativo ufficiale dell'atto: numero CELEX per gli atti UE adottati (es. 32022L2464 per la CSRD), numero COM per le proposte UE, numero e anno per leggi, decreti e DDL italiani. Indicalo anche se l'articolo non lo riporta, ma solo se ne sei certo; altrimenti null",
       ),
     titolo: z.string().describe("Titolo o nome dell'atto come citato nell'articolo"),
     giurisdizione: z
@@ -26,7 +26,9 @@ const attoCitato = z
       .nullable()
       .describe("ue per atti dell'Unione europea, italia per atti italiani, null se non è chiaro"),
   })
-  .describe("Un atto normativo citato nell'articolo");
+  .describe(
+    "Un atto normativo citato nell'articolo (direttiva, regolamento, decisione, atto delegato, legge, decreto, disegno di legge o una loro proposta); non rapporti, consultazioni, bozze di standard o documenti di lavoro",
+  );
 
 const notiziaTrovata = z
   .object({
@@ -39,7 +41,9 @@ const notiziaTrovata = z
     pubblicata_da: z
       .string()
       .nullable()
-      .describe("Chi ha pubblicato l'articolo (testata, ente o istituzione), null se non è chiaro"),
+      .describe(
+        "Nome breve di chi ha pubblicato l'articolo: la testata o l'ente (es. «Commissione europea», «Il Sole 24 Ore»), senza direzioni o uffici interni; null se non è chiaro",
+      ),
     riassunto: z
       .string()
       .describe("Riassunto in italiano di 2-4 frasi: di quale normativa parla, cosa cambia e per chi"),
