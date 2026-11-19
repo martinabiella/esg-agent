@@ -10,7 +10,7 @@ export function urlHttpValido(testo: string): boolean {
   }
 }
 
-// Parametri che dicono da dove arriva il lettore, non quale articolo è.
+// Parametri che dicono da dove arriva il lettore, non di quale Notizia si tratta.
 const PARAMETRI_TRACKING = new Set([
   "fbclid",
   "gclid",

@@ -31,7 +31,8 @@ export async function ultimaRicercaRiuscita(fonteId: number): Promise<Ricerca | 
 // Il driver neon-http non ha transazioni interattive: le scritture che vanno
 // insieme stanno in una sola istruzione, quindi atomica.
 
-// Notizie (Provenienza "agente") e collegamenti, poi la chiusura della Ricerca.
+// Notizie dell'agente (provenienza_contenuti = 'agente') e collegamenti, poi la
+// chiusura della Ricerca.
 // La riga della Ricerca è bloccata (FOR UPDATE) e deve essere ancora in corso:
 // un secondo recapito dello stesso evento, anche in contemporanea, non scrive
 // nulla. Gli URL già presenti si saltano (vincolo unique su notizia.url). Si
@@ -39,7 +40,7 @@ export async function ultimaRicercaRiuscita(fonteId: number): Promise<Ricerca | 
 async function completaRicerca(id: number, notizie: NotiziaDaSalvare[]) {
   const righe = notizie.map((n) => ({
     titolo: n.titolo,
-    fonte: n.fonte,
+    fonte: n.pubblicataDa,
     data: n.data,
     url: n.url,
     riassunto: n.riassunto,
@@ -47,7 +48,7 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[]) {
     atti: n.atti,
   }));
   const risultato = await db.execute<{ notizie_create: number }>(sql`
-    WITH presa AS (
+    WITH ricerca_bloccata AS (
       SELECT id FROM esecuzione_ricerca
       WHERE id = ${id} AND esito = 'in_corso'
       FOR UPDATE
@@ -60,7 +61,7 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[]) {
       INSERT INTO notizia (titolo, fonte, data, url, riassunto, provenienza_contenuti, segnala_novita)
       SELECT titolo, fonte, data, url, riassunto, 'agente', segnala_novita
       FROM dati
-      WHERE EXISTS (SELECT 1 FROM presa)
+      WHERE EXISTS (SELECT 1 FROM ricerca_bloccata)
       ON CONFLICT (url) DO NOTHING
       RETURNING id, url
     ), collegamenti AS (
@@ -74,7 +75,7 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[]) {
     )
     UPDATE esecuzione_ricerca
     SET esito = 'completata', terminata_il = now(), notizie_create = (SELECT count(*) FROM nuove)
-    WHERE id IN (SELECT id FROM presa)
+    WHERE id IN (SELECT id FROM ricerca_bloccata)
     RETURNING notizie_create
   `);
   const [riga] = risultato.rows;

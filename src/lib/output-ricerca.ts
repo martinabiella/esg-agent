@@ -85,10 +85,13 @@ function testoOpzionale(testo: string | null): string | null {
   return testo?.trim() || null;
 }
 
+// Un campo dell'output che non va, per il motivo mostrato agli utenti.
+type ProblemaOutput = { campo: string; messaggio: string };
+
 const PROBLEMI_MOSTRATI = 3;
 
 // "notizie.1.url: …": le posizioni partono da 1, per chi legge il motivo.
-function motivoNonValido(problemi: { campo: string; messaggio: string }[]): string {
+function motivoNonValido(problemi: readonly ProblemaOutput[]): string {
   const elenco = problemi
     .slice(0, PROBLEMI_MOSTRATI)
     .map((p) => (p.campo ? `${p.campo}: ${p.messaggio}` : p.messaggio))
@@ -99,19 +102,19 @@ function motivoNonValido(problemi: { campo: string; messaggio: string }[]): stri
   }.`;
 }
 
-function campo(percorso: readonly PropertyKey[]): string {
+function campoDaPercorso(percorso: readonly PropertyKey[]): string {
   return percorso.map((p) => (typeof p === "number" ? String(p + 1) : String(p))).join(".");
 }
 
 const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
 
 // Quello che lo schema JSON di Parallel non sa esprimere (niente format né
-// minLength). La data può essere domani: l'articolo è datato col fuso di chi
+// minLength). La data può essere domani: la Notizia è datata col fuso di chi
 // pubblica, il server ragiona in UTC.
-function problemiDiContenuto(notizie: z.infer<typeof outputRicerca>["notizie"], ora: Date) {
+function problemiDiContenuto(notizie: z.infer<typeof outputRicerca>["notizie"], ora: Date): ProblemaOutput[] {
   const domani = new Date(ora.getTime() + UN_GIORNO_MS);
   return notizie.flatMap((n, i) => {
-    const problemi: { campo: string; messaggio: string }[] = [];
+    const problemi: ProblemaOutput[] = [];
     const posizione = `notizie.${i + 1}`;
     if (!n.titolo.trim()) problemi.push({ campo: `${posizione}.titolo`, messaggio: "titolo vuoto" });
     if (!urlHttpValido(n.url.trim())) {
@@ -125,12 +128,12 @@ function problemiDiContenuto(notizie: z.infer<typeof outputRicerca>["notizie"], 
   });
 }
 
-export function validaOutputRicerca(content: unknown, ora: Date): EsitoOutputRicerca {
-  const esito = outputRicerca.safeParse(content, { error: it().localeError });
+export function validaOutputRicerca(contenuto: unknown, ora: Date): EsitoOutputRicerca {
+  const esito = outputRicerca.safeParse(contenuto, { error: it().localeError });
   if (!esito.success) {
     return {
       ok: false,
-      errore: motivoNonValido(esito.error.issues.map((i) => ({ campo: campo(i.path), messaggio: i.message }))),
+      errore: motivoNonValido(esito.error.issues.map((i) => ({ campo: campoDaPercorso(i.path), messaggio: i.message }))),
     };
   }
   const problemi = problemiDiContenuto(esito.data.notizie, ora);

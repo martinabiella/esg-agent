@@ -4,10 +4,11 @@
 // Vocabolario: vedi GLOSSARY.md
 
 import { z } from "zod";
+import type { esitoRicerca } from "../db/schema";
 import { type AttoCatalogo, trovaAttoCitato } from "./atto-citato";
 import type { TipoFonte } from "./fonte";
 import { type NotiziaTrovata, VERSIONE_OUTPUT, schemaOutputParallel, validaOutputRicerca } from "./output-ricerca";
-import { type ClientParallel, ErroreParallel } from "./parallel";
+import { type ClientParallel, ErroreParallel, type RichiestaTaskRun } from "./parallel";
 
 const GIORNI_PRIMA_RICERCA = 30;
 const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
@@ -18,7 +19,9 @@ const PROCESSORE = "core";
 
 export type FonteRicerca = { id: number; nome: string; url: string; tipo: TipoFonte };
 
-export type EsitoRicerca = "in_corso" | "completata" | "fallita" | "saltata_per_tetto";
+// Dall'enum esito_ricerca del database (import solo di tipo: i test non
+// caricano il DB).
+export type EsitoRicerca = (typeof esitoRicerca.enumValues)[number];
 
 export type NuovaRicerca = {
   fonteId: number;
@@ -29,11 +32,11 @@ export type NuovaRicerca = {
   errore: string | null;
 };
 
-// Una Notizia pronta per il salvataggio, con Provenienza "agente".
+// Una Notizia trovata dall'agente, pronta per il salvataggio.
 export type NotiziaDaSalvare = {
   titolo: string;
-  // "Pubblicata da"
-  fonte: string;
+  // Chi ha pubblicato la Notizia (colonna notizia.fonte): non è la Fonte monitorata.
+  pubblicataDa: string;
   data: string | null;
   url: string;
   riassunto: string;
@@ -94,6 +97,7 @@ export type EsitoAvvio =
   | { esito: "fallita"; errore: string };
 
 // Il motivo compare agli utenti nella pagina Fonti: niente messaggi tecnici.
+// I dettagli restano nel log del server.
 function motivoAvvioFallito(e: unknown): string {
   if (!(e instanceof ErroreParallel)) return "Parallel non è raggiungibile: la Ricerca non è partita.";
   const motivo =
@@ -103,9 +107,9 @@ function motivoAvvioFallito(e: unknown): string {
         ? "credito esaurito"
         : e.stato === 429
           ? "troppe richieste, riprova più tardi"
-          : e.stato === 422
-            ? "richiesta non valida"
-            : `errore ${e.stato}`;
+          : e.stato >= 500
+            ? "servizio non disponibile"
+            : "richiesta non valida";
   return `Parallel non ha avviato la Ricerca: ${motivo}.`;
 }
 
@@ -113,17 +117,20 @@ export async function avviaRicercaPerFonte(fonte: FonteRicerca, deps: Dipendenze
   const avviataIl = deps.ora();
   const ultimaRiuscita = await deps.archivio.ultimaRicercaRiuscita(fonte.id);
   const dal = finestraRicerca(ultimaRiuscita, avviataIl);
+  // Fuori dal try: un errore di configurazione (URL del webhook mancante) non
+  // è un problema di Parallel e non va registrato come tale.
+  const richiesta: RichiestaTaskRun = {
+    input: istruzioni(fonte, dal),
+    processor: PROCESSORE,
+    task_spec: { output_schema: { type: "json", json_schema: schemaOutputParallel() } },
+    source_policy: { include_domains: [dominio(fonte.url)], after_date: dal },
+    metadata: { fonte_id: fonte.id, fonte_nome: fonte.nome, versione_schema: VERSIONE_OUTPUT },
+    webhook: { url: deps.urlWebhook, event_types: ["task_run.status"] },
+  };
 
   let runId: string;
   try {
-    ({ runId } = await deps.client.avviaTaskRun({
-      input: istruzioni(fonte, dal),
-      processor: PROCESSORE,
-      task_spec: { output_schema: { type: "json", json_schema: schemaOutputParallel() } },
-      source_policy: { include_domains: [dominio(fonte.url)], after_date: dal },
-      metadata: { fonte_id: fonte.id, fonte_nome: fonte.nome, versione_schema: VERSIONE_OUTPUT },
-      webhook: { url: deps.urlWebhook, event_types: ["task_run.status"] },
-    }));
+    ({ runId } = await deps.client.avviaTaskRun(richiesta));
   } catch (e) {
     console.error(`Avvio della Ricerca per la Fonte ${fonte.id} non riuscito`, e);
     const errore = motivoAvvioFallito(e);
@@ -174,7 +181,7 @@ export type EsitoWebhook =
 
 const GIA_ELABORATA: EsitoWebhook = { esito: "ignorato", motivo: "Ricerca già elaborata" };
 
-// Un articolo ripetuto nell'output (stesso URL normalizzato) conta una volta.
+// Una Notizia ripetuta nell'output (stesso URL normalizzato) conta una volta.
 function senzaDoppioni(notizie: readonly NotiziaTrovata[]): NotiziaTrovata[] {
   const visti = new Set<string>();
   return notizie.filter((n) => !visti.has(n.url) && visti.add(n.url));
@@ -184,8 +191,9 @@ function senzaDoppioni(notizie: readonly NotiziaTrovata[]): NotiziaTrovata[] {
 // catalogo, o ambiguo, fa segnalare una novità: Parallel non conosce il
 // catalogo, quindi lo decide il codice. Un Atto Non rilevante non si collega e
 // non fa scattare la segnalazione.
-// «Pubblicata da»: l'editore indicato dall'agente, altrimenti il nome della Fonte.
-function daSalvare(
+// «Pubblicata da»: l'editore indicato dall'agente, altrimenti il nome della
+// Fonte (o, se manca anche quello, il dominio della Notizia).
+function notizieDaSalvare(
   notizie: readonly NotiziaTrovata[],
   atti: readonly AttoCatalogo[],
   nomeFonte: string,
@@ -196,7 +204,7 @@ function daSalvare(
     const daControllare = esiti.some((e) => e.esito === "assente" || e.esito === "ambiguo");
     return {
       titolo: n.titolo,
-      fonte: n.pubblicataDa ?? (nomeFonte || new URL(n.url).hostname),
+      pubblicataDa: n.pubblicataDa ?? (nomeFonte || new URL(n.url).hostname),
       data: n.data,
       url: n.url,
       riassunto: n.riassunto,
@@ -216,12 +224,19 @@ const eventoStato = z.object({
   }),
 });
 
-const LUNGHEZZA_MASSIMA_MOTIVO = 200;
+// Stati finali di un task run: gli altri (queued, running…) non chiudono nulla.
+const STATI_CONCLUSI = ["completed", "failed", "cancelled"] as const;
+type StatoConcluso = (typeof STATI_CONCLUSI)[number];
 
-function motivoRunNonCompletato(stato: string, messaggio: string | null | undefined): string {
-  const dettaglio =
-    stato === "cancelled" ? "annullata" : (messaggio?.trim() || "errore non specificato").slice(0, LUNGHEZZA_MASSIMA_MOTIVO);
-  return `Parallel non ha completato la Ricerca (${dettaglio}).`;
+function statoConcluso(stato: string): stato is StatoConcluso {
+  return (STATI_CONCLUSI as readonly string[]).includes(stato);
+}
+
+// Il messaggio di Parallel (in inglese, tecnico) resta nel log del server.
+function motivoRunNonCompletato(stato: Exclude<StatoConcluso, "completed">): string {
+  return stato === "cancelled"
+    ? "La Ricerca è stata annullata su Parallel."
+    : "Parallel non è riuscito a completare la Ricerca.";
 }
 
 // Elabora un evento task_run.status già verificato (firma). Il contenuto
@@ -231,8 +246,7 @@ export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): 
   const letto = eventoStato.safeParse(evento);
   if (!letto.success) return { esito: "ignorato", motivo: "Evento non riconosciuto" };
   const { run_id: runId, status, error } = letto.data.data;
-  const concluso = status === "completed" || status === "failed" || status === "cancelled";
-  if (!concluso) return { esito: "ignorato", motivo: `Run non concluso (${status})` };
+  if (!statoConcluso(status)) return { esito: "ignorato", motivo: `Run non concluso (${status})` };
 
   const ricerca = await deps.archivio.ricercaPerRunId(runId);
   if (!ricerca) return { esito: "sconosciuta" };
@@ -243,13 +257,15 @@ export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): 
     return chiusa ? { esito: "fallita", errore } : GIA_ELABORATA;
   };
 
-  if (status !== "completed") return fallita(motivoRunNonCompletato(status, error?.message));
+  if (status !== "completed") {
+    console.error(`Run Parallel ${runId} concluso con stato ${status}`, error?.message ?? "");
+    return fallita(motivoRunNonCompletato(status));
+  }
 
   const risultato = await deps.client.risultatoTaskRun(runId);
-  const versione = risultato.metadata?.versione_schema;
-  if (versione !== VERSIONE_OUTPUT) {
+  if (risultato.metadata?.versione_schema !== VERSIONE_OUTPUT) {
     return fallita(
-      `La Ricerca è stata avviata con la versione ${String(versione)} dello schema, ora è la ${VERSIONE_OUTPUT}: il risultato non è stato letto.`,
+      `La Ricerca è stata avviata con un'altra versione dello schema dei risultati (ora v${VERSIONE_OUTPUT}): il risultato non è stato letto.`,
     );
   }
   const output = validaOutputRicerca(risultato.contenuto, deps.ora());
@@ -260,6 +276,6 @@ export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): 
   const nomeFonte = String(risultato.metadata?.fonte_nome ?? "");
   const atti = await deps.archivio.attiCatalogo();
   // Un altro recapito dello stesso evento può averla chiusa nel frattempo.
-  const scritto = await deps.archivio.completaRicerca(ricerca.id, daSalvare(output.notizie, atti, nomeFonte));
+  const scritto = await deps.archivio.completaRicerca(ricerca.id, notizieDaSalvare(output.notizie, atti, nomeFonte));
   return scritto ? { esito: "completata", notizieCreate: scritto.notizieCreate } : GIA_ELABORATA;
 }

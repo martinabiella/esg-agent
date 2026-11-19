@@ -58,9 +58,9 @@ Variabili d'ambiente (in `.env.local`, mai nel repository):
 | `PARALLEL_WEBHOOK_SECRET` | Segreto dei webhook di Parallel (`whsec_…`, in Parallel → Settings → Webhooks): verifica la firma del webhook |
 | `PARALLEL_WEBHOOK_URL` | Facoltativa. URL a cui Parallel manda il webhook; se manca, `https://<dominio di produzione Vercel>/api/parallel/webhook` |
 
-Per le scritture (azioni server e rotte API) usare `utenteRichiesto()` da `@/lib/auth`: restituisce l'utente corrente o lancia `NonAutenticatoError`.
+Per le scritture (azioni server e rotte API) usare `utenteRichiesto()` da `@/lib/auth`: restituisce l'utente corrente o lancia `NonAutenticatoError`. Unica eccezione è il webhook di Parallel (`/api/parallel/webhook`): non ha una sessione e si autentica con la firma di Parallel (vedi "Agente (Parallel)").
 
-Il proxy (`src/proxy.ts`) rimanda a `/auth/sign-in` chi non ha una sessione. Ogni scrittura verifica comunque la sessione lato server.
+Il proxy (`src/proxy.ts`) rimanda a `/auth/sign-in` chi non ha una sessione, tranne per il webhook di Parallel. Ogni scrittura verifica comunque la sessione (o la firma, per il webhook) lato server.
 
 Better Auth UI fornisce i moduli di accesso e reset password, la vista di uscita e il menu utente. I vecchi link `/accedi` e `/reimposta` funzionano ancora.
 

@@ -224,7 +224,7 @@ test("elaboraWebhook: run completato con output valido, salva le Notizie e chiud
       {
         id: 1,
         titolo: "Omnibus: rinvio degli obblighi CSRD",
-        fonte: "Commissione europea",
+        pubblicataDa: "Commissione europea",
         data: "2026-11-18",
         url: "https://eur-lex.europa.eu/legal-content/IT/TXT/?uri=CELEX:52025PC0081",
         riassunto: "La Commissione propone di rinviare gli obblighi.",
@@ -255,7 +255,7 @@ test("elaboraWebhook: un risultato prodotto con un'altra versione dello schema n
 
   const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
-  const errore = "La Ricerca è stata avviata con la versione 0 dello schema, ora è la 1: il risultato non è stato letto.";
+  const errore = "La Ricerca è stata avviata con un'altra versione dello schema dei risultati (ora v1): il risultato non è stato letto.";
   assert.deepEqual(esito, { esito: "fallita", errore });
   assert.deepEqual(archivio.notizie, []);
   assert.equal(archivio.ricerche[0].errore, errore);
@@ -273,14 +273,14 @@ test("elaboraWebhook: lo stesso evento ricevuto due volte non crea Notizie dupli
   assert.equal(archivio.ricerche[0].notizieCreate, 1);
 });
 
-test("elaboraWebhook: lo stesso articolo in una Ricerca successiva o ripetuto nell'output non si duplica", async () => {
+test("elaboraWebhook: la stessa Notizia in una Ricerca successiva o ripetuta nell'output non si duplica", async () => {
   const { archivio, client, deps } = await ricercaAvviata({ notizie: [notiziaOutput()] });
   await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
   await avviaRicercaPerFonte(EUR_LEX, deps);
-  const stessoArticolo = notiziaOutput({ url: "https://eur-lex.europa.eu/legal-content/IT/TXT/?uri=CELEX:52025PC0081#top" });
+  const stessaNotizia = notiziaOutput({ url: "https://eur-lex.europa.eu/legal-content/IT/TXT/?uri=CELEX:52025PC0081#top" });
   const nuovo = notiziaOutput({ url: "https://eur-lex.europa.eu/nuovo", titolo: "Nuovo" });
-  client.risultati.set("trun_2", { metadata: METADATI_EUR_LEX, contenuto: { notizie: [stessoArticolo, nuovo, nuovo] } });
+  client.risultati.set("trun_2", { metadata: METADATI_EUR_LEX, contenuto: { notizie: [stessaNotizia, nuovo, nuovo] } });
   const esito = await elaboraWebhook(eventoCompletato("trun_2"), deps);
 
   assert.deepEqual(esito, { esito: "completata", notizieCreate: 1 });
@@ -356,7 +356,7 @@ test("elaboraWebhook: senza editore nell'output, «Pubblicata da» è il nome de
 
   await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
-  assert.equal(archivio.notizie[0].fonte, "EUR-Lex");
+  assert.equal(archivio.notizie[0].pubblicataDa, "EUR-Lex");
 });
 
 test("elaboraWebhook: un run fallito o annullato su Parallel chiude la Ricerca come fallita", async () => {
@@ -370,14 +370,14 @@ test("elaboraWebhook: un run fallito o annullato su Parallel chiude la Ricerca c
     deps,
   );
 
-  const errore = "Parallel non ha completato la Ricerca (Task execution failed).";
+  const errore = "Parallel non è riuscito a completare la Ricerca.";
   assert.deepEqual(esito, { esito: "fallita", errore });
   assert.equal(archivio.ricerche[0].esito, "fallita");
   assert.equal(archivio.ricerche[0].errore, errore);
 
   const annullata = await ricercaAvviata({ notizie: [] });
   await elaboraWebhook({ type: "task_run.status", data: { run_id: "trun_1", status: "cancelled", error: null } }, annullata.deps);
-  assert.equal(annullata.archivio.ricerche[0].errore, "Parallel non ha completato la Ricerca (annullata).");
+  assert.equal(annullata.archivio.ricerche[0].errore, "La Ricerca è stata annullata su Parallel.");
 });
 
 test("elaboraWebhook: eventi di altro tipo, malformati o di run ancora attivi si ignorano senza scrivere", async () => {
@@ -401,4 +401,37 @@ test("elaboraWebhook: eventi di altro tipo, malformati o di run ancora attivi si
 test("elaboraWebhook: un run che il log non conosce va ritentato", async () => {
   const { deps } = dipendenze();
   assert.deepEqual(await elaboraWebhook(eventoCompletato("trun_ignoto"), deps), { esito: "sconosciuta" });
+});
+
+test("elaboraWebhook: senza versione dello schema nei metadati il risultato non viene letto", async () => {
+  const { archivio, deps } = await ricercaAvviata({ notizie: [notiziaOutput()] }, { fonte_id: 1, fonte_nome: "EUR-Lex" });
+
+  const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
+
+  assert.equal(esito.esito, "fallita");
+  assert.equal(archivio.ricerche[0].errore?.includes("undefined"), false);
+  assert.deepEqual(archivio.notizie, []);
+});
+
+test("avviaRicercaPerFonte: un errore del servizio Parallel non mostra codici agli utenti", async () => {
+  const { archivio, client, deps } = dipendenze();
+  client.falliscePer.set("EUR-Lex", new ErroreParallel(503, "Service Unavailable"));
+
+  await avviaRicercaPerFonte(EUR_LEX, deps);
+
+  assert.equal(archivio.ricerche[0].errore, "Parallel non ha avviato la Ricerca: servizio non disponibile.");
+});
+
+test("avviaRicercaPerFonte: un errore di configurazione non passa per un problema di Parallel", async () => {
+  const { archivio, client, deps } = dipendenze();
+  const senzaWebhook: DipendenzeRicerca = {
+    ...deps,
+    get urlWebhook(): string {
+      throw new Error("Variabile d'ambiente PARALLEL_WEBHOOK_URL mancante");
+    },
+  };
+
+  await assert.rejects(avviaRicercaPerFonte(EUR_LEX, senzaWebhook), /PARALLEL_WEBHOOK_URL/);
+  assert.deepEqual(client.richieste, []);
+  assert.deepEqual(archivio.ricerche, []);
 });
