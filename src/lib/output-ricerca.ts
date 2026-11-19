@@ -76,8 +76,11 @@ export type NotiziaTrovata = {
   attiCitati: AttoCitato[];
 };
 
+// Una Notizia dell'output che non supera i controlli: si scarta da sola.
+export type NotiziaScartata = { posizione: number; motivo: string };
+
 export type EsitoOutputRicerca =
-  | { ok: true; notizie: NotiziaTrovata[] }
+  | { ok: true; notizie: NotiziaTrovata[]; scartate: NotiziaScartata[] }
   // Il testo compare agli utenti come motivo per cui la Fonte non è leggibile.
   | { ok: false; errore: string };
 
@@ -85,25 +88,28 @@ function testoOpzionale(testo: string | null): string | null {
   return testo?.trim() || null;
 }
 
-// Un campo dell'output che non va, per il motivo mostrato agli utenti.
+// Un campo dell'output che non va.
 type ProblemaOutput = { campo: string; messaggio: string };
 
 const PROBLEMI_MOSTRATI = 3;
 
-// "notizie.1.url: …": le posizioni partono da 1, per chi legge il motivo.
-function motivoNonValido(problemi: readonly ProblemaOutput[]): string {
+// "notizie.1.url: …; notizie.1.data: …": le posizioni partono da 1, per chi legge.
+function elencoProblemi(problemi: readonly ProblemaOutput[]): string {
   const elenco = problemi
     .slice(0, PROBLEMI_MOSTRATI)
     .map((p) => (p.campo ? `${p.campo}: ${p.messaggio}` : p.messaggio))
     .join("; ");
   const altri = problemi.length - PROBLEMI_MOSTRATI;
-  return `Il risultato di Parallel non rispetta lo schema (v${VERSIONE_OUTPUT}): ${elenco}${
-    altri > 0 ? ` (e altri ${altri})` : ""
-  }.`;
+  return altri > 0 ? `${elenco} (e altri ${altri})` : elenco;
 }
 
-function campoDaPercorso(percorso: readonly PropertyKey[]): string {
-  return percorso.map((p) => (typeof p === "number" ? String(p + 1) : String(p))).join(".");
+function campoDaPercorso(prefisso: string, percorso: readonly PropertyKey[]): string {
+  const parti = percorso.map((p) => (typeof p === "number" ? String(p + 1) : String(p)));
+  return [prefisso, ...parti].filter(Boolean).join(".");
+}
+
+function problemiDiStruttura(errore: z.ZodError, prefisso: string): ProblemaOutput[] {
+  return errore.issues.map((i) => ({ campo: campoDaPercorso(prefisso, i.path), messaggio: i.message }));
 }
 
 const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
@@ -111,47 +117,65 @@ const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
 // Quello che lo schema JSON di Parallel non sa esprimere (niente format né
 // minLength). La data può essere domani: la Notizia è datata col fuso di chi
 // pubblica, il server ragiona in UTC.
-function problemiDiContenuto(notizie: z.infer<typeof outputRicerca>["notizie"], ora: Date): ProblemaOutput[] {
-  const domani = new Date(ora.getTime() + UN_GIORNO_MS);
-  return notizie.flatMap((n, i) => {
-    const problemi: ProblemaOutput[] = [];
-    const posizione = `notizie.${i + 1}`;
-    if (!n.titolo.trim()) problemi.push({ campo: `${posizione}.titolo`, messaggio: "titolo vuoto" });
-    if (!urlHttpValido(n.url.trim())) {
-      problemi.push({ campo: `${posizione}.url`, messaggio: "atteso un URL assoluto http o https" });
-    }
-    const data = testoOpzionale(n.data);
-    if (data !== null && !dataPlausibile(data, domani)) {
-      problemi.push({ campo: `${posizione}.data`, messaggio: "attesa una data reale AAAA-MM-GG, non futura" });
-    }
-    return problemi;
-  });
+function problemiDiContenuto(n: z.infer<typeof notiziaTrovata>, prefisso: string, domani: Date): ProblemaOutput[] {
+  const problemi: ProblemaOutput[] = [];
+  if (!n.titolo.trim()) problemi.push({ campo: `${prefisso}.titolo`, messaggio: "titolo vuoto" });
+  if (!urlHttpValido(n.url.trim())) {
+    problemi.push({ campo: `${prefisso}.url`, messaggio: "atteso un URL assoluto http o https" });
+  }
+  const data = testoOpzionale(n.data);
+  if (data !== null && !dataPlausibile(data, domani)) {
+    problemi.push({ campo: `${prefisso}.data`, messaggio: "attesa una data reale AAAA-MM-GG, non futura" });
+  }
+  return problemi;
 }
 
-export function validaOutputRicerca(contenuto: unknown, ora: Date): EsitoOutputRicerca {
-  const esito = outputRicerca.safeParse(contenuto, { error: it().localeError });
-  if (!esito.success) {
-    return {
-      ok: false,
-      errore: motivoNonValido(esito.error.issues.map((i) => ({ campo: campoDaPercorso(i.path), messaggio: i.message }))),
-    };
-  }
-  const problemi = problemiDiContenuto(esito.data.notizie, ora);
-  if (problemi.length > 0) return { ok: false, errore: motivoNonValido(problemi) };
+function notiziaPulita(n: z.infer<typeof notiziaTrovata>): NotiziaTrovata {
   return {
-    ok: true,
-    notizie: esito.data.notizie.map((n) => ({
-      titolo: n.titolo.trim(),
-      url: normalizzaUrlNotizia(n.url),
-      data: testoOpzionale(n.data),
-      pubblicataDa: testoOpzionale(n.pubblicata_da),
-      riassunto: n.riassunto.trim(),
-      segnalaNovita: n.segnala_novita,
-      attiCitati: n.atti_citati.map((a) => ({
-        identificativoUfficiale: testoOpzionale(a.identificativo_ufficiale),
-        titolo: a.titolo.trim(),
-        giurisdizione: a.giurisdizione,
-      })),
+    titolo: n.titolo.trim(),
+    url: normalizzaUrlNotizia(n.url),
+    data: testoOpzionale(n.data),
+    pubblicataDa: testoOpzionale(n.pubblicata_da),
+    riassunto: n.riassunto.trim(),
+    segnalaNovita: n.segnala_novita,
+    attiCitati: n.atti_citati.map((a) => ({
+      identificativoUfficiale: testoOpzionale(a.identificativo_ufficiale),
+      titolo: a.titolo.trim(),
+      giurisdizione: a.giurisdizione,
     })),
   };
+}
+
+// Per la validazione basta l'elenco: ogni Notizia si controlla da sola.
+const elencoNotizie = z.object({ notizie: z.array(z.unknown()) });
+
+// Senza l'elenco delle Notizie l'output non è valido e la Ricerca fallisce. Una
+// Notizia che non supera i controlli (struttura, URL, titolo, data) si scarta
+// da sola: le altre si salvano.
+export function validaOutputRicerca(contenuto: unknown, ora: Date): EsitoOutputRicerca {
+  const errori = { error: it().localeError };
+  const elenco = elencoNotizie.safeParse(contenuto, errori);
+  if (!elenco.success) {
+    return {
+      ok: false,
+      errore: `Il risultato di Parallel non rispetta lo schema (v${VERSIONE_OUTPUT}): ${elencoProblemi(
+        problemiDiStruttura(elenco.error, ""),
+      )}.`,
+    };
+  }
+
+  const domani = new Date(ora.getTime() + UN_GIORNO_MS);
+  const notizie: NotiziaTrovata[] = [];
+  const scartate: NotiziaScartata[] = [];
+  elenco.data.notizie.forEach((grezza, i) => {
+    const posizione = i + 1;
+    const prefisso = `notizie.${posizione}`;
+    const letta = notiziaTrovata.safeParse(grezza, errori);
+    const problemi = letta.success
+      ? problemiDiContenuto(letta.data, prefisso, domani)
+      : problemiDiStruttura(letta.error, prefisso);
+    if (letta.success && problemi.length === 0) notizie.push(notiziaPulita(letta.data));
+    else scartate.push({ posizione, motivo: elencoProblemi(problemi) });
+  });
+  return { ok: true, notizie, scartate };
 }

@@ -217,7 +217,7 @@ test("elaboraWebhook: run completato con output valido, salva le Notizie e chiud
 
   const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
-  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1 });
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0 });
   assert.deepEqual(
     archivio.notizie,
     [
@@ -238,16 +238,26 @@ test("elaboraWebhook: run completato con output valido, salva le Notizie e chiud
 });
 
 test("elaboraWebhook: output non valido, nessuna scrittura e Ricerca fallita nel log", async () => {
-  const { archivio, deps } = await ricercaAvviata({
-    notizie: [notiziaOutput(), notiziaOutput({ url: "non-un-url", titolo: "Seconda" })],
-  });
+  const { archivio, deps } = await ricercaAvviata({ notizie: "nessun elenco" });
 
   const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
   assert.equal(esito.esito, "fallita");
   assert.deepEqual(archivio.notizie, []);
   assert.equal(archivio.ricerche[0].esito, "fallita");
-  assert.match(archivio.ricerche[0].errore ?? "", /non rispetta lo schema \(v1\): notizie\.2\.url/);
+  assert.match(archivio.ricerche[0].errore ?? "", /non rispetta lo schema \(v1\): notizie/);
+});
+
+test("elaboraWebhook: una Notizia non valida si scarta, le altre si salvano e la Ricerca è completata", async () => {
+  const { archivio, deps } = await ricercaAvviata({
+    notizie: [notiziaOutput(), notiziaOutput({ url: "non-un-url", titolo: "Seconda" })],
+  });
+
+  const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
+
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 1 });
+  assert.deepEqual(archivio.notizie.map((n) => n.titolo), ["Omnibus: rinvio degli obblighi CSRD"]);
+  assert.equal(archivio.ricerche[0].esito, "completata");
 });
 
 test("elaboraWebhook: un risultato prodotto con un'altra versione dello schema non viene letto", async () => {
@@ -283,7 +293,7 @@ test("elaboraWebhook: la stessa Notizia in una Ricerca successiva o ripetuta nel
   client.risultati.set("trun_2", { metadata: METADATI_EUR_LEX, contenuto: { notizie: [stessaNotizia, nuovo, nuovo] } });
   const esito = await elaboraWebhook(eventoCompletato("trun_2"), deps);
 
-  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1 });
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0 });
   assert.deepEqual(
     archivio.notizie.map((n) => n.titolo),
     ["Omnibus: rinvio degli obblighi CSRD", "Nuovo"],
@@ -434,4 +444,28 @@ test("avviaRicercaPerFonte: un errore di configurazione non passa per un problem
   await assert.rejects(avviaRicercaPerFonte(EUR_LEX, senzaWebhook), /PARALLEL_WEBHOOK_URL/);
   assert.deepEqual(client.richieste, []);
   assert.deepEqual(archivio.ricerche, []);
+});
+
+test("elaboraWebhook: una Notizia che cita solo Atti Non rilevanti non segnala una novità, anche se l'agente lo dice", async () => {
+  const { archivio, deps } = await ricercaAvviata({
+    notizie: [
+      notiziaOutput({ url: "https://eur-lex.europa.eu/solo-escluso", segnala_novita: true, atti_citati: [citato("32020R0852", "Tassonomia")] }),
+      notiziaOutput({
+        url: "https://eur-lex.europa.eu/escluso-e-presente",
+        segnala_novita: true,
+        atti_citati: [citato("32020R0852", "Tassonomia"), citato("32022L2464", "CSRD")],
+      }),
+    ],
+  });
+  archivio.atti = CATALOGO;
+
+  await elaboraWebhook(eventoCompletato("trun_1"), deps);
+
+  assert.deepEqual(
+    archivio.notizie.map((n) => [n.url.split("/").pop(), n.segnalaNovita, n.atti]),
+    [
+      ["solo-escluso", false, []],
+      ["escluso-e-presente", true, [7]],
+    ],
+  );
 });

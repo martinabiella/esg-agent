@@ -171,7 +171,8 @@ export async function avviaRicerchePerFonti(
 // ---- Webhook di fine run ----
 
 export type EsitoWebhook =
-  | { esito: "completata"; notizieCreate: number }
+  // notizieScartate: Notizie dell'output che non superavano i controlli.
+  | { esito: "completata"; notizieCreate: number; notizieScartate: number }
   | { esito: "fallita"; errore: string }
   // Evento che non riguarda una Ricerca da chiudere: si conferma e basta.
   | { esito: "ignorato"; motivo: string }
@@ -190,7 +191,8 @@ function senzaDoppioni(notizie: readonly NotiziaTrovata[]): NotiziaTrovata[] {
 // Collega gli Atti riconosciuti con certezza. Un Atto citato ma assente dal
 // catalogo, o ambiguo, fa segnalare una novità: Parallel non conosce il
 // catalogo, quindi lo decide il codice. Un Atto Non rilevante non si collega e
-// non fa scattare la segnalazione.
+// non fa scattare la segnalazione; una Notizia che cita solo Atti Non rilevanti
+// non segnala mai una novità, così non entra nell'Avviso di conferma.
 // «Pubblicata da»: l'editore indicato dall'agente, altrimenti il nome della
 // Fonte (o, se manca anche quello, il dominio della Notizia).
 function notizieDaSalvare(
@@ -202,13 +204,14 @@ function notizieDaSalvare(
     const esiti = n.attiCitati.map((c) => trovaAttoCitato(c, atti));
     const collegati = esiti.flatMap((e) => (e.esito === "collegato" ? [e.attoId] : []));
     const daControllare = esiti.some((e) => e.esito === "assente" || e.esito === "ambiguo");
+    const soloNonRilevanti = esiti.length > 0 && esiti.every((e) => e.esito === "non_rilevante");
     return {
       titolo: n.titolo,
       pubblicataDa: n.pubblicataDa ?? (nomeFonte || new URL(n.url).hostname),
       data: n.data,
       url: n.url,
       riassunto: n.riassunto,
-      segnalaNovita: n.segnalaNovita || daControllare,
+      segnalaNovita: !soloNonRilevanti && (n.segnalaNovita || daControllare),
       atti: [...new Set(collegati)],
     };
   });
@@ -270,6 +273,9 @@ export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): 
   }
   const output = validaOutputRicerca(risultato.contenuto, deps.ora());
   if (!output.ok) return fallita(output.errore);
+  for (const s of output.scartate) {
+    console.warn(`Run Parallel ${runId}: Notizia ${s.posizione} scartata (${s.motivo})`);
+  }
 
   // Il nome viaggia nei metadati del run: la Fonte potrebbe essere stata
   // eliminata o rinominata nel frattempo.
@@ -277,5 +283,7 @@ export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): 
   const atti = await deps.archivio.attiCatalogo();
   // Un altro recapito dello stesso evento può averla chiusa nel frattempo.
   const scritto = await deps.archivio.completaRicerca(ricerca.id, notizieDaSalvare(output.notizie, atti, nomeFonte));
-  return scritto ? { esito: "completata", notizieCreate: scritto.notizieCreate } : GIA_ELABORATA;
+  return scritto
+    ? { esito: "completata", notizieCreate: scritto.notizieCreate, notizieScartate: output.scartate.length }
+    : GIA_ELABORATA;
 }

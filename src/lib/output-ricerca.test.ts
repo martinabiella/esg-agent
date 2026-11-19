@@ -28,35 +28,43 @@ test("validaOutputRicerca: un output valido diventa l'elenco delle Notizie trova
         attiCitati: [{ identificativoUfficiale: "32022L2464", titolo: "CSRD", giurisdizione: "ue" }],
       },
     ],
+    scartate: [],
   });
 });
 
-test("validaOutputRicerca: output con struttura sbagliata, motivo in italiano con il campo", () => {
-  const esito = validaOutputRicerca({ notizie: [{ ...notiziaValida, url: null }] }, ORA);
-  assert.equal(esito.ok, false);
-  if (!esito.ok) {
-    assert.match(esito.errore, /^Il risultato di Parallel non rispetta lo schema \(v1\): /);
-    assert.match(esito.errore, /notizie\.1\.url/);
-    assert.match(esito.errore, /atteso string/);
-  }
-  for (const content of [null, "testo", { notizie: "x" }, {}]) {
-    assert.equal(validaOutputRicerca(content, ORA).ok, false, JSON.stringify(content));
+test("validaOutputRicerca: senza l'elenco delle Notizie l'output non è valido, motivo in italiano", () => {
+  for (const contenuto of [null, "testo", { notizie: "x" }, {}]) {
+    const esito = validaOutputRicerca(contenuto, ORA);
+    assert.equal(esito.ok, false, JSON.stringify(contenuto));
+    if (!esito.ok) assert.match(esito.errore, /^Il risultato di Parallel non rispetta lo schema \(v1\): /);
   }
 });
 
-test("validaOutputRicerca: URL non http, titolo vuoto o data non reale rendono l'output non valido", () => {
+test("validaOutputRicerca: una Notizia con struttura sbagliata si scarta, le altre restano", () => {
+  const altra = { ...notiziaValida, url: "https://www.esempio.it/altra", titolo: "Altra" };
+  const esito = validaOutputRicerca({ notizie: [{ ...notiziaValida, url: null }, altra] }, ORA);
+  assert.ok(esito.ok);
+  assert.deepEqual(esito.notizie.map((n) => n.titolo), ["Altra"]);
+  assert.equal(esito.scartate.length, 1);
+  assert.equal(esito.scartate[0].posizione, 1);
+  assert.match(esito.scartate[0].motivo, /^notizie\.1\.url: .*atteso string/);
+});
+
+test("validaOutputRicerca: URL non http, titolo vuoto o data non reale scartano solo quella Notizia", () => {
   const casi = [
-    { modifica: { url: "/relativo/articolo" }, campo: "notizie.1.url" },
-    { modifica: { url: "javascript:alert(1)" }, campo: "notizie.1.url" },
-    { modifica: { titolo: "   " }, campo: "notizie.1.titolo" },
-    { modifica: { data: "18/11/2026" }, campo: "notizie.1.data" },
-    { modifica: { data: "2026-02-30" }, campo: "notizie.1.data" },
-    { modifica: { data: "2026-11-21" }, campo: "notizie.1.data" },
+    { modifica: { url: "/relativo/pagina" }, campo: "notizie.2.url" },
+    { modifica: { url: "javascript:alert(1)" }, campo: "notizie.2.url" },
+    { modifica: { titolo: "   " }, campo: "notizie.2.titolo" },
+    { modifica: { data: "18/11/2026" }, campo: "notizie.2.data" },
+    { modifica: { data: "2026-02-30" }, campo: "notizie.2.data" },
+    { modifica: { data: "2026-11-21" }, campo: "notizie.2.data" },
   ];
   for (const { modifica, campo } of casi) {
-    const esito = validaOutputRicerca({ notizie: [{ ...notiziaValida, ...modifica }] }, ORA);
-    assert.equal(esito.ok, false, JSON.stringify(modifica));
-    if (!esito.ok) assert.ok(esito.errore.includes(campo), esito.errore);
+    const esito = validaOutputRicerca({ notizie: [notiziaValida, { ...notiziaValida, ...modifica }] }, ORA);
+    assert.ok(esito.ok, JSON.stringify(modifica));
+    assert.equal(esito.notizie.length, 1, JSON.stringify(modifica));
+    assert.deepEqual(esito.scartate.map((s) => s.posizione), [2]);
+    assert.ok(esito.scartate[0].motivo.startsWith(campo), esito.scartate[0].motivo);
   }
 });
 
