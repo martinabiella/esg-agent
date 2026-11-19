@@ -1,5 +1,5 @@
 import { idIntero } from "./id";
-import { urlHttpValido } from "./url";
+import { normalizzaUrlNotizia, urlHttpValido } from "./url";
 
 type ParametriNotizia = Record<string, string | string[] | undefined>;
 
@@ -47,8 +47,9 @@ export type EsitoNotizia =
 
 const ANNO_MINIMO = 1900;
 
-// Data reale (YYYY-MM-DD) tra il 1900 e oggi.
-function dataPlausibile(testo: string, oggi: Date): boolean {
+// Data reale (YYYY-MM-DD) tra il 1900 e oggi. Usata anche per le Notizie
+// trovate dall'agente (src/lib/output-ricerca.ts).
+export function dataPlausibile(testo: string, oggi: Date): boolean {
   const parti = /^(\d{4})-(\d{2})-(\d{2})$/.exec(testo);
   if (!parti) return false;
   const [anno, mese, giorno] = [Number(parti[1]), Number(parti[2]), Number(parti[3])];
@@ -95,6 +96,13 @@ export function validaNotizia(input: InputNotizia, oggi: Date = new Date()): Esi
 
   return {
     ok: true,
-    valori: { titolo, fonte, url, data: testoData || null, riassunto: grezzi.riassunto.trim(), atti },
+    valori: {
+      titolo,
+      fonte,
+      url: normalizzaUrlNotizia(url),
+      data: testoData || null,
+      riassunto: grezzi.riassunto.trim(),
+      atti,
+    },
   };
 }

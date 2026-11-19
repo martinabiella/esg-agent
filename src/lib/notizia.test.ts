@@ -51,6 +51,12 @@ test("validaNotizia: l'URL salvato è senza spazi ai bordi", () => {
   assert.ok(esito.ok && esito.valori.url === "https://esempio.it/a");
 });
 
+test("validaNotizia: l'URL salvato è normalizzato, come per le Notizie dell'agente", () => {
+  const esito = validaNotizia({ ...base, url: "https://Esempio.it/Art?id=4&utm_source=nl#top" }, OGGI);
+  assert.ok(esito.ok);
+  assert.equal(esito.valori.url, "https://esempio.it/Art?id=4");
+});
+
 test("validaNotizia: data facoltativa, reale e plausibile", () => {
   const ok = validaNotizia({ ...base, data: "2026-06-15" }, OGGI);
   assert.ok(ok.ok && ok.valori.data === "2026-06-15");

@@ -46,6 +46,8 @@ export default async function proxy(request: NextRequest) {
   return risposta;
 }
 
+// Il webhook di Parallel (src/app/api/parallel/webhook) non ha una sessione:
+// si autentica con la firma, quindi resta fuori dal proxy.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/parallel/webhook).*)"],
 };
