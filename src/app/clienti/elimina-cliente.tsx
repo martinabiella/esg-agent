@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { eliminaClienteAzione } from "./azioni";
+import { eliminaClienteAzione, type StatoModulo } from "./azioni";
 
 export function EliminaCliente({
   id,
@@ -26,12 +26,17 @@ export function EliminaCliente({
   onEliminato: () => void;
 }) {
   const [aperto, setAperto] = useState(false);
-  const [stato, esegui, inCorso] = useActionState(eliminaClienteAzione, undefined);
-  const eliminato = !!stato?.salvato;
-
-  useEffect(() => {
-    if (eliminato) onEliminato();
-  }, [eliminato, onEliminato]);
+  // onEliminato parte subito dopo l'azione e non da un effetto: la risposta
+  // porta anche l'elenco aggiornato, in cui il Cliente non c'è più, e questo
+  // componente sparisce dal drawer prima che un effetto possa girare.
+  const [stato, esegui, inCorso] = useActionState(
+    async (precedente: StatoModulo, formData: FormData) => {
+      const esito = await eliminaClienteAzione(precedente, formData);
+      if (esito?.salvato) onEliminato();
+      return esito;
+    },
+    undefined,
+  );
 
   return (
     <>
