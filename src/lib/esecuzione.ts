@@ -13,26 +13,33 @@ import {
 } from "./ricerca-fonte";
 
 const UN_ORA_MS = 60 * 60 * 1000;
-// Una Ricerca in corso da più di 2 ore non blocca nuove esecuzioni: il
-// processore "core" risponde di solito in pochi minuti. Resta però aperta, così
-// un risultato in ritardo si salva lo stesso.
+
+// Una Ricerca in corso da più di 2 ore non blocca nuove Esecuzioni ed è senza
+// risposta: il processore "core" risponde di solito in pochi minuti. Resta però
+// aperta, così un risultato in ritardo si salva lo stesso.
 const ORE_BLOCCO = 2;
+const inizioBlocco = (ora: Date) => new Date(ora.getTime() - ORE_BLOCCO * UN_ORA_MS);
 
 // Parallel ritenta il webhook per 48 ore: dopo, il risultato non arriva più e
-// la Ricerca si chiude come fallita (la Fonte risulta non leggibile).
-const ORE_SCADENZA = 48;
+// la Ricerca si chiude come fallita (la Fonte risulta non leggibile). La
+// pagina Fonti la mostra così già prima che la prossima Esecuzione la chiuda.
+export const ORE_SCADENZA = 48;
+// Neutro: la Ricerca può essere rimasta in corso anche senza che Parallel
+// l'abbia mai ricevuta (per esempio se la funzione si è interrotta).
+export const ERRORE_SCADUTA = "Il risultato della Ricerca non è mai arrivato.";
 
 const ERRORE_IMPREVISTO = "Errore imprevisto: la Ricerca non è partita.";
-const ERRORE_SCADUTA = "Parallel non ha mai inviato il risultato della Ricerca.";
 
-// Tetto di Ricerche per esecuzione, se TETTO_RICERCHE manca o non è valida:
+// Tetto di Ricerche per Esecuzione, se TETTO_RICERCHE manca o non è valida:
 // lascia spazio alle Fonti ufficiali, a una Ricerca per Tema e a quella
 // generale, con margine per la crescita dell'elenco.
 export const TETTO_PREDEFINITO = 20;
 
 export function tettoRicerche(valore: string | undefined): number {
   const testo = valore?.trim() ?? "";
-  return /^\d+$/.test(testo) && Number(testo) > 0 ? Number(testo) : TETTO_PREDEFINITO;
+  if (/^\d+$/.test(testo) && Number(testo) > 0) return Number(testo);
+  if (testo) console.warn(`TETTO_RICERCHE non valida (${JSON.stringify(valore)}): uso ${TETTO_PREDEFINITO}`);
+  return TETTO_PREDEFINITO;
 }
 
 export type FonteDaControllare = FonteRicerca & {
@@ -67,7 +74,7 @@ export type NuovaEsecuzione = {
   bloccanteDal: Date;
 };
 
-export type EsecuzioneAperta =
+export type AperturaEsecuzione =
   | { esito: "aperta"; ricerche: { fonteId: number; ricercaId: number }[] }
   // inCorsoDal: avvio dell'esecuzione in corso più recente.
   | { esito: "bloccata"; inCorsoDal: Date };
@@ -78,7 +85,7 @@ export interface ArchivioEsecuzioni extends ArchivioRicerche {
   // registra le Ricerche dell'esecuzione, tutte con lo stesso avviata_il: in
   // corso senza run quelle da avviare, saltate per tetto le altre. Due avvii
   // contemporanei non aprono due esecuzioni.
-  apriEsecuzione(esecuzione: NuovaEsecuzione): Promise<EsecuzioneAperta>;
+  apriEsecuzione(esecuzione: NuovaEsecuzione): Promise<AperturaEsecuzione>;
   // Le Ricerche ancora in corso avviate prima di avviatePrima diventano
   // fallite con questo errore. Restituisce quante sono.
   chiudiRicercheScadute(avviatePrima: Date, errore: string): Promise<number>;
@@ -111,7 +118,7 @@ export async function avviaEsecuzione(deps: DipendenzeEsecuzione): Promise<Esito
     avviataIl,
     daAvviare: scelta.daAvviare.map((f) => f.id),
     saltate: scelta.saltate.map((f) => f.id),
-    bloccanteDal: new Date(avviataIl.getTime() - ORE_BLOCCO * UN_ORA_MS),
+    bloccanteDal: inizioBlocco(avviataIl),
   });
   if (aperta.esito === "bloccata") return { esito: "gia_in_corso", inCorsoDal: aperta.inCorsoDal };
 
@@ -175,7 +182,7 @@ export function esitoEsecuzione({ avviataIl, ricerche }: UltimaEsecuzione, ora: 
   const frasi: string[] = [];
   let stato: EsitoEsecuzione["stato"];
 
-  if (inCorso.length > 0 && avviataIl.getTime() > ora.getTime() - ORE_BLOCCO * UN_ORA_MS) {
+  if (inCorso.length > 0 && avviataIl > inizioBlocco(ora)) {
     stato = "in_corso";
     const concluse = partite.length - inCorso.length;
     frasi.push(`${quante(concluse, "Ricerca conclusa", "Ricerche concluse")} su ${partite.length}.`);
@@ -188,7 +195,7 @@ export function esitoEsecuzione({ avviataIl, ricerche }: UltimaEsecuzione, ora: 
       `${quante(completate.length, "Fonte controllata", "Fonti controllate")}, ${quante(notizie, "Notizia nuova", "Notizie nuove")}.`,
     );
     if (fallite.length > 0) frasi.push(`Non leggibili: ${nomi(fallite)}.`);
-    if (inCorso.length > 0) frasi.push(`Senza risposta da Parallel: ${nomi(inCorso)}.`);
+    if (inCorso.length > 0) frasi.push(`Senza risposta: ${nomi(inCorso)}.`);
   }
   if (saltate > 0) frasi.push(`${quante(saltate, "Fonte saltata", "Fonti saltate")} per tetto.`);
   return { stato, avviataIl, descrizione: frasi.join(" ") };

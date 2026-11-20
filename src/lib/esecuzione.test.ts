@@ -201,7 +201,7 @@ test("avviaEsecuzione: le Ricerche senza risultato da più di 48 ore diventano f
   assert.deepEqual(
     archivio.ricerche.map((r) => [r.avviataIl, r.esito, r.errore]),
     [
-      [scaduta, "fallita", "Parallel non ha mai inviato il risultato della Ricerca."],
+      [scaduta, "fallita", "Il risultato della Ricerca non è mai arrivato."],
       [recente, "in_corso", null],
       [ORA, "in_corso", null],
     ],
@@ -267,6 +267,28 @@ test("esitoEsecuzione: dopo 2 ore una Ricerca ancora in corso è senza risposta 
   assert.deepEqual(esitoEsecuzione({ avviataIl, ricerche }, ORA), {
     stato: "fonti_non_leggibili",
     avviataIl,
-    descrizione: "1 Fonte controllata, 0 Notizie nuove. Senza risposta da Parallel: B.",
+    descrizione: "1 Fonte controllata, 0 Notizie nuove. Senza risposta: B.",
   });
+});
+
+test("avviaEsecuzione: se il run partito su Parallel non si registra, la Ricerca lo dice e le altre partono", async () => {
+  const { archivio, client, deps } = dipendenze();
+  archivio.fonti = [fonte(1, "ufficiale", null), fonte(2, "ufficiale", null)];
+  const originale = archivio.assegnaRun.bind(archivio);
+  archivio.assegnaRun = async (ricercaId, runId) => {
+    if (ricercaId === 1) throw new Error("connessione al DB persa");
+    return originale(ricercaId, runId);
+  };
+
+  const esito = await avviaEsecuzione(deps);
+
+  assert.deepEqual(esito, { esito: "avviata", avviataIl: ORA, avviate: 1, fallite: 1, saltate: 0 });
+  assert.equal(client.richieste.length, 2);
+  assert.deepEqual(
+    archivio.ricerche.map((r) => [r.fonteId, r.esito, r.errore]),
+    [
+      [1, "fallita", "La Ricerca è partita su Parallel ma non è stato possibile registrarla: il risultato andrà perso."],
+      [2, "in_corso", null],
+    ],
+  );
 });

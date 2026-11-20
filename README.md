@@ -58,7 +58,7 @@ Variabili d'ambiente (in `.env.local`, mai nel repository):
 | `PARALLEL_WEBHOOK_SECRET` | Segreto dei webhook di Parallel (`whsec_…`, in Parallel → Settings → Webhooks): verifica la firma del webhook |
 | `PARALLEL_WEBHOOK_URL` | Facoltativa. URL a cui Parallel manda il webhook; se manca, `https://<dominio di produzione Vercel>/api/parallel/webhook` |
 | `CRON_SECRET` | Segreto del cron delle Ricerche, almeno 16 caratteri: `openssl rand -base64 32`. Vercel lo manda come `Authorization: Bearer <CRON_SECRET>`; senza, l'endpoint del cron risponde 500 |
-| `TETTO_RICERCHE` | Facoltativa. Numero massimo di Ricerche per esecuzione (intero positivo, default 20) |
+| `TETTO_RICERCHE` | Facoltativa. Numero massimo di Ricerche per Esecuzione (intero positivo, default 20) |
 
 Per le scritture (azioni server e rotte API) usare `utenteRichiesto()` da `@/lib/auth`: restituisce l'utente corrente o lancia `NonAutenticatoError`. Fanno eccezione il webhook di Parallel (`/api/parallel/webhook`), che si autentica con la firma di Parallel, e il cron delle Ricerche (`/api/cron/esecuzione`), che si autentica con `CRON_SECRET` (vedi "Agente (Parallel)").
 
@@ -78,15 +78,15 @@ Il webhook non raggiunge `localhost`: in locale si prova con il client finto dei
 
 ### Esecuzione settimanale e pulsante
 
-Un'esecuzione parte in due modi:
+Un'Esecuzione parte in due modi:
 - il cron di Vercel (`vercel.json`) chiama `GET /api/cron/esecuzione` ogni lunedì alle 05:00 UTC, cioè tra le 6 e le 7 in inverno e tra le 7 e le 8 in estate in Italia. Con il piano Hobby parte in un momento qualunque di quell'ora;
 - il pulsante «Avvia ricerca ora» nella pagina Fonti, per qualunque utente autenticato.
 
-Regole dell'esecuzione:
+Regole dell'Esecuzione:
 - **Tetto.** Partono al massimo `TETTO_RICERCHE` Ricerche: prima le Fonti ufficiali, poi le editoriali. A parità di tipo partono prima le Fonti mai partite e poi quelle partite meno di recente. Le altre sono registrate come «saltate per tetto».
-- **Un'esecuzione alla volta.** Se una Ricerca avviata da meno di 2 ore è ancora in corso, un nuovo avvio non fa nulla.
+- **Un'Esecuzione alla volta.** Se una Ricerca avviata da meno di 2 ore è ancora in corso, un nuovo avvio non fa nulla.
 - **Ritardi.** Dopo 2 ore una Ricerca senza risultato non blocca più, ma resta aperta: un webhook in ritardo salva le Notizie lo stesso. Dopo 48 ore, quando Parallel smette di ritentare, la Ricerca diventa fallita.
-- **Nessun retry.** Una Ricerca fallita si recupera all'esecuzione successiva grazie alla finestra temporale.
+- **Nessun retry.** Una Ricerca fallita si recupera all'Esecuzione successiva grazie alla finestra temporale.
 
 Cose da sapere sul cron:
 - Vercel lo chiama solo sul deploy di produzione, non ritenta in caso di errore e non segue i redirect: per questo la rotta è esclusa dal proxy.

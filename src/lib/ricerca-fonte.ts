@@ -109,9 +109,13 @@ function motivoAvvioFallito(e: unknown): string {
   return `Parallel non ha avviato la Ricerca: ${motivo}.`;
 }
 
+const RUN_NON_REGISTRATO =
+  "La Ricerca è partita su Parallel ma non è stato possibile registrarla: il risultato andrà perso.";
+
 // Avvia su Parallel una Ricerca già registrata in corso e le assegna il run.
-// Registrarla prima evita run senza traccia nel log: se l'assegnazione del run
-// non riesce, la Ricerca resta in corso finché non scade.
+// Registrarla prima evita run senza traccia nel log. Se è l'assegnazione del
+// run a non riuscire, il webhook non troverà la Ricerca: il run resta nel log
+// del server e la Ricerca, se si riesce ancora a scriverla, risulta fallita.
 export async function avviaRicercaPerFonte(
   fonte: FonteRicerca,
   ricerca: RicercaRegistrata,
@@ -140,7 +144,13 @@ export async function avviaRicercaPerFonte(
     return { esito: "fallita", errore };
   }
 
-  await deps.archivio.assegnaRun(ricerca.id, runId);
+  try {
+    await deps.archivio.assegnaRun(ricerca.id, runId);
+  } catch (e) {
+    console.error(`Run Parallel ${runId} avviato ma non assegnato alla Ricerca ${ricerca.id}`, e);
+    await deps.archivio.segnaFallita(ricerca.id, RUN_NON_REGISTRATO);
+    return { esito: "fallita", errore: RUN_NON_REGISTRATO };
+  }
   return { esito: "avviata", ricercaId: ricerca.id, runId };
 }
 

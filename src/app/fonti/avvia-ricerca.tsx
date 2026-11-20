@@ -38,7 +38,7 @@ function messaggio(stato: NonNullable<StatoAvvio>): { testo: string; errore: boo
       };
     case "gia_in_corso":
       return {
-        testo: `C'è già un'esecuzione in corso, avviata il ${formatoDataOra.format(stato.inCorsoDal)}: non ne parte un'altra.`,
+        testo: `C'è già un'Esecuzione in corso, avviata il ${formatoDataOra.format(stato.inCorsoDal)}: non ne parte un'altra.`,
         errore: false,
       };
     case "nessuna_fonte":
@@ -48,7 +48,7 @@ function messaggio(stato: NonNullable<StatoAvvio>): { testo: string; errore: boo
   }
 }
 
-// Avvia la stessa esecuzione del cron del lunedì e mostra l'esito dell'ultima:
+// Avvia la stessa Esecuzione del cron del lunedì e mostra l'esito dell'ultima:
 // l'unica traccia del log delle Ricerche nell'interfaccia.
 export function AvviaRicerca({ ultima }: { ultima: EsitoEsecuzione | null }) {
   const [stato, avvia, inAvvio] = useActionState(avviaEsecuzioneAzione, undefined);
@@ -58,7 +58,7 @@ export function AvviaRicerca({ ultima }: { ultima: EsitoEsecuzione | null }) {
     <Card className="mt-4">
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
-          Ultima esecuzione
+          Ultima Esecuzione
           {ultima && <Badge variant={VARIANTE[ultima.stato]}>{etichettaEsitoEsecuzione[ultima.stato]}</Badge>}
         </CardTitle>
         <CardDescription>

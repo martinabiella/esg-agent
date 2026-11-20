@@ -4,7 +4,7 @@ import { fontiDaControllare } from "./fonti";
 import { attoNormativo, chiaveNomeFonte, esecuzioneRicerca, fonte } from "./schema";
 import type {
   ArchivioEsecuzioni,
-  EsecuzioneAperta,
+  AperturaEsecuzione,
   NuovaEsecuzione,
   UltimaEsecuzione,
 } from "@/lib/esecuzione";
@@ -116,23 +116,24 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[]) {
   return riga ? { notizieCreate: Number(riga.notizie_create) } : null;
 }
 
-// Un'esecuzione alla volta: il lock consultivo, preso nella stessa transazione,
-// mette in fila due avvii contemporanei. In READ COMMITTED ogni istruzione
-// legge i dati confermati al suo inizio, quindi l'insert che segue il lock
-// vede le Ricerche registrate dall'avvio che lo teneva.
-// Le date nell'SQL grezzo viaggiano come ISO in UTC: le colonne sono
-// timestamp senza fuso, come le scrive Drizzle.
+// Un'Esecuzione alla volta: il lock consultivo, preso nella stessa
+// transazione, mette in fila due avvii contemporanei. In READ COMMITTED ogni
+// istruzione legge i dati confermati al suo inizio, quindi l'insert che segue
+// il lock vede le Ricerche registrate dall'avvio che lo teneva.
+// L'avvio nell'SQL grezzo viaggia come ISO in UTC: le colonne sono timestamp
+// senza fuso, come le scrive Drizzle.
 async function apriEsecuzione({
   avviataIl,
   daAvviare,
   saltate,
   bloccanteDal,
-}: NuovaEsecuzione): Promise<EsecuzioneAperta> {
+}: NuovaEsecuzione): Promise<AperturaEsecuzione> {
   const righe = [
     ...daAvviare.map((fonteId) => ({ fonte_id: fonteId, esito: "in_corso" })),
     ...saltate.map((fonteId) => ({ fonte_id: fonteId, esito: "saltata_per_tetto" })),
   ];
   const avviata = avviataIl.toISOString();
+  const bloccanti = and(eq(esecuzioneRicerca.esito, "in_corso"), gt(esecuzioneRicerca.avviataIl, bloccanteDal));
   const [, registrate, [bloccante]] = await db.batch([
     db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('esg-agent:avvio-esecuzione'))`),
     db.execute<{ id: number; fonte_id: number; esito: string }>(sql`
@@ -140,19 +141,13 @@ async function apriEsecuzione({
       SELECT 'per_fonte', r.fonte_id, ${avviata}::timestamp, r.esito,
         CASE WHEN r.esito = 'saltata_per_tetto' THEN ${avviata}::timestamp END
       FROM jsonb_to_recordset(${JSON.stringify(righe)}::jsonb) AS r(fonte_id int, esito esito_ricerca)
-      WHERE NOT EXISTS (
-        SELECT 1 FROM esecuzione_ricerca e
-        WHERE e.esito = 'in_corso' AND e.avviata_il > ${bloccanteDal.toISOString()}::timestamp
-      )
+      WHERE NOT EXISTS (SELECT 1 FROM ${esecuzioneRicerca} WHERE ${bloccanti})
       RETURNING id, fonte_id, esito
     `),
-    db
-      .select({ il: max(esecuzioneRicerca.avviataIl) })
-      .from(esecuzioneRicerca)
-      .where(and(eq(esecuzioneRicerca.esito, "in_corso"), gt(esecuzioneRicerca.avviataIl, bloccanteDal))),
+    db.select({ il: max(esecuzioneRicerca.avviataIl) }).from(esecuzioneRicerca).where(bloccanti),
   ]);
   // Le righe da registrare non sono mai vuote: se non ne è entrata nessuna,
-  // un'altra esecuzione è in corso.
+  // un'altra Esecuzione è in corso.
   if (registrate.rows.length === 0) return { esito: "bloccata", inCorsoDal: bloccante?.il ?? bloccanteDal };
   return {
     esito: "aperta",

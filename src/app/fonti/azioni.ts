@@ -123,10 +123,10 @@ export type StatoAvvio =
   | { esito: "errore"; messaggio: string }
   | undefined;
 
-// La stessa esecuzione del cron del lunedì, per qualunque utente autenticato.
-// L'esito dettagliato si legge poi accanto al pulsante (ultima esecuzione).
+// La stessa Esecuzione del cron del lunedì, per qualunque utente autenticato.
+// L'esito dettagliato si legge poi accanto al pulsante (ultima Esecuzione).
 export async function avviaEsecuzioneAzione(): Promise<StatoAvvio> {
-  const messaggio = await senzaSessione("Sessione scaduta: accedi di nuovo per avviare la ricerca.");
+  const messaggio = await senzaSessione("Sessione scaduta: accedi di nuovo per avviare le Ricerche.");
   if (messaggio) return { esito: "errore", messaggio };
   let esito: EsitoAvvioEsecuzione;
   try {
@@ -135,7 +135,7 @@ export async function avviaEsecuzioneAzione(): Promise<StatoAvvio> {
     console.error("Avvio manuale delle Ricerche non riuscito", e);
     return {
       esito: "errore",
-      messaggio: "L'esecuzione non è partita per un errore di configurazione o del database.",
+      messaggio: "L'Esecuzione non è partita per un errore di configurazione o del database.",
     };
   }
   revalidatePath("/fonti");
