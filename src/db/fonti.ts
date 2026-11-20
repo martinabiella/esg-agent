@@ -1,5 +1,6 @@
-import { and, asc, count, desc, eq, isNotNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNotNull, lt, max, ne, or, sql } from "drizzle-orm";
 import { db } from "./index";
+import { ERRORE_SCADUTA, type FonteDaControllare, ORE_SCADENZA } from "@/lib/esecuzione";
 import {
   type CampiFonte,
   type ControlloFonte,
@@ -22,9 +23,13 @@ export type FonteElenco = {
 // Per il drawer: anche quanti Atti hanno questa Fonte come origine.
 export type FonteDettaglio = FonteElenco & { attiScoperti: number };
 
-// Per ogni Fonte, l'ultima Ricerca conclusa (quelle in corso non contano). Il
-// confronto con il cambio di URL lo fa controlloFonte.
+// Per ogni Fonte, l'ultima Ricerca conclusa. Quelle in corso non contano,
+// tranne le scadute (oltre ORE_SCADENZA): sono già fallite anche se la
+// prossima Esecuzione non le ha ancora chiuse. Il confronto con il cambio di
+// URL lo fa controlloFonte.
 function ultimeRicerche() {
+  // avviata_il è UTC senza fuso, come lo scrive Drizzle.
+  const scadenza = sql`(now() AT TIME ZONE 'UTC') - make_interval(hours => ${ORE_SCADENZA})`;
   return db
     .selectDistinctOn([esecuzioneRicerca.fonteId], {
       fonteId: esecuzioneRicerca.fonteId,
@@ -33,7 +38,12 @@ function ultimeRicerche() {
       errore: esecuzioneRicerca.errore,
     })
     .from(esecuzioneRicerca)
-    .where(and(isNotNull(esecuzioneRicerca.fonteId), ne(esecuzioneRicerca.esito, "in_corso")))
+    .where(
+      and(
+        isNotNull(esecuzioneRicerca.fonteId),
+        or(ne(esecuzioneRicerca.esito, "in_corso"), lt(esecuzioneRicerca.avviataIl, scadenza)),
+      ),
+    )
     .orderBy(esecuzioneRicerca.fonteId, desc(esecuzioneRicerca.avviataIl), desc(esecuzioneRicerca.id))
     .as("ultima_ricerca");
 }
@@ -59,9 +69,12 @@ function selezioneFonti() {
 type RigaFonte = Awaited<ReturnType<typeof selezioneFonti>>[number];
 
 function fonteElenco(r: RigaFonte): FonteElenco {
+  // Una Ricerca ancora in corso arriva qui solo se è scaduta.
   const ultima: UltimaRicerca | null =
-    r.esito && r.esito !== "in_corso" && r.avviataIl
-      ? { esito: r.esito, avviataIl: r.avviataIl, errore: r.errore }
+    r.esito && r.avviataIl
+      ? r.esito === "in_corso"
+        ? { esito: "fallita", avviataIl: r.avviataIl, errore: ERRORE_SCADUTA }
+        : { esito: r.esito, avviataIl: r.avviataIl, errore: r.errore }
       : null;
   return {
     id: r.id,
@@ -80,6 +93,37 @@ export async function elencoFonti(): Promise<FonteElenco[]> {
     asc(fonte.id),
   );
   return righe.map(fonteElenco);
+}
+
+// Le Fonti per un'esecuzione delle Ricerche, con l'avvio dell'ultima Ricerca
+// partita davvero (non saltata per tetto) dopo l'ultimo cambio di URL: serve a
+// far passare davanti, quando le Fonti superano il tetto, quelle rimaste indietro.
+export async function fontiDaControllare(): Promise<FonteDaControllare[]> {
+  const ultimaPartita = db
+    .select({
+      fonteId: esecuzioneRicerca.fonteId,
+      il: max(esecuzioneRicerca.avviataIl).as("ultima_partita_il"),
+    })
+    .from(esecuzioneRicerca)
+    .innerJoin(fonte, eq(fonte.id, esecuzioneRicerca.fonteId))
+    .where(
+      and(
+        ne(esecuzioneRicerca.esito, "saltata_per_tetto"),
+        gte(esecuzioneRicerca.avviataIl, fonte.urlModificatoIl),
+      ),
+    )
+    .groupBy(esecuzioneRicerca.fonteId)
+    .as("ultima_partita");
+  return db
+    .select({
+      id: fonte.id,
+      nome: fonte.nome,
+      url: fonte.url,
+      tipo: fonte.tipo,
+      ultimaPartitaIl: ultimaPartita.il,
+    })
+    .from(fonte)
+    .leftJoin(ultimaPartita, eq(ultimaPartita.fonteId, fonte.id));
 }
 
 export async function trovaFonte(id: number): Promise<FonteDettaglio | null> {
