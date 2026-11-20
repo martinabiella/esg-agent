@@ -2,8 +2,8 @@
 // database. Le variabili d'ambiente sono descritte nel README.
 
 import { archivioRicerche } from "@/db/ricerche";
+import { type DipendenzeEsecuzione, TETTO_PREDEFINITO, tettoRicerche } from "./esecuzione";
 import { clientParallelHttp } from "./parallel";
-import type { DipendenzeRicerca } from "./ricerca-fonte";
 
 export const PERCORSO_WEBHOOK = "/api/parallel/webhook";
 
@@ -23,7 +23,16 @@ function urlWebhook(): string {
   throw new Error("Variabile d'ambiente PARALLEL_WEBHOOK_URL mancante");
 }
 
-export function dipendenzeAgente(): DipendenzeRicerca {
+function tetto(): number {
+  const valore = process.env.TETTO_RICERCHE?.trim();
+  const letto = tettoRicerche(valore);
+  if (valore && String(letto) !== valore) {
+    console.warn(`TETTO_RICERCHE non valida (${JSON.stringify(valore)}): uso ${TETTO_PREDEFINITO}`);
+  }
+  return letto;
+}
+
+export function dipendenzeAgente(): DipendenzeEsecuzione {
   return {
     client: clientParallelHttp(variabile("PARALLEL_API_KEY")),
     archivio: archivioRicerche,
@@ -32,5 +41,6 @@ export function dipendenzeAgente(): DipendenzeRicerca {
       return urlWebhook();
     },
     ora: () => new Date(),
+    tetto: tetto(),
   };
 }

@@ -1,7 +1,14 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, lt, max, sql } from "drizzle-orm";
 import { db } from "./index";
-import { attoNormativo, esecuzioneRicerca, fonte } from "./schema";
-import type { ArchivioRicerche, NotiziaDaSalvare } from "@/lib/ricerca-fonte";
+import { fontiDaControllare } from "./fonti";
+import { attoNormativo, chiaveNomeFonte, esecuzioneRicerca, fonte } from "./schema";
+import type {
+  ArchivioEsecuzioni,
+  EsecuzioneAperta,
+  NuovaEsecuzione,
+  UltimaEsecuzione,
+} from "@/lib/esecuzione";
+import type { NotiziaDaSalvare } from "@/lib/ricerca-fonte";
 
 export type Ricerca = typeof esecuzioneRicerca.$inferSelect;
 
@@ -27,7 +34,34 @@ export async function ultimaRicercaRiuscita(fonteId: number): Promise<Ricerca | 
   return riga?.ricerca ?? null;
 }
 
-// ---- Archivio per l'agente (src/lib/ricerca-fonte.ts) ----
+// Le Ricerche dell'ultima esecuzione, cioè quelle con l'avvio più recente
+// (un'esecuzione le registra tutte con lo stesso avviata_il), per nome della
+// Fonte. null se non è mai partita una Ricerca.
+export async function ultimaEsecuzione(): Promise<UltimaEsecuzione | null> {
+  const righe = await db
+    .select({
+      avviataIl: esecuzioneRicerca.avviataIl,
+      fonte: fonte.nome,
+      esito: esecuzioneRicerca.esito,
+      notizieCreate: esecuzioneRicerca.notizieCreate,
+    })
+    .from(esecuzioneRicerca)
+    .leftJoin(fonte, eq(fonte.id, esecuzioneRicerca.fonteId))
+    .where(
+      eq(
+        esecuzioneRicerca.avviataIl,
+        db.select({ il: max(esecuzioneRicerca.avviataIl) }).from(esecuzioneRicerca),
+      ),
+    )
+    .orderBy(asc(chiaveNomeFonte(fonte.nome)), asc(esecuzioneRicerca.id));
+  if (righe.length === 0) return null;
+  return {
+    avviataIl: righe[0].avviataIl,
+    ricerche: righe.map(({ fonte, esito, notizieCreate }) => ({ fonte, esito, notizieCreate })),
+  };
+}
+
+// ---- Archivio per l'agente (src/lib/ricerca-fonte.ts e src/lib/esecuzione.ts) ----
 // Il driver neon-http non ha transazioni interattive: le scritture che vanno
 // insieme stanno in una sola istruzione, quindi atomica.
 
@@ -82,25 +116,71 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[]) {
   return riga ? { notizieCreate: Number(riga.notizie_create) } : null;
 }
 
-export const archivioRicerche: ArchivioRicerche = {
+// Un'esecuzione alla volta: il lock consultivo, preso nella stessa transazione,
+// mette in fila due avvii contemporanei. In READ COMMITTED ogni istruzione
+// legge i dati confermati al suo inizio, quindi l'insert che segue il lock
+// vede le Ricerche registrate dall'avvio che lo teneva.
+// Le date nell'SQL grezzo viaggiano come ISO in UTC: le colonne sono
+// timestamp senza fuso, come le scrive Drizzle.
+async function apriEsecuzione({
+  avviataIl,
+  daAvviare,
+  saltate,
+  bloccanteDal,
+}: NuovaEsecuzione): Promise<EsecuzioneAperta> {
+  const righe = [
+    ...daAvviare.map((fonteId) => ({ fonte_id: fonteId, esito: "in_corso" })),
+    ...saltate.map((fonteId) => ({ fonte_id: fonteId, esito: "saltata_per_tetto" })),
+  ];
+  const avviata = avviataIl.toISOString();
+  const [, registrate, [bloccante]] = await db.batch([
+    db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('esg-agent:avvio-esecuzione'))`),
+    db.execute<{ id: number; fonte_id: number; esito: string }>(sql`
+      INSERT INTO esecuzione_ricerca (tipo, fonte_id, avviata_il, esito, terminata_il)
+      SELECT 'per_fonte', r.fonte_id, ${avviata}::timestamp, r.esito,
+        CASE WHEN r.esito = 'saltata_per_tetto' THEN ${avviata}::timestamp END
+      FROM jsonb_to_recordset(${JSON.stringify(righe)}::jsonb) AS r(fonte_id int, esito esito_ricerca)
+      WHERE NOT EXISTS (
+        SELECT 1 FROM esecuzione_ricerca e
+        WHERE e.esito = 'in_corso' AND e.avviata_il > ${bloccanteDal.toISOString()}::timestamp
+      )
+      RETURNING id, fonte_id, esito
+    `),
+    db
+      .select({ il: max(esecuzioneRicerca.avviataIl) })
+      .from(esecuzioneRicerca)
+      .where(and(eq(esecuzioneRicerca.esito, "in_corso"), gt(esecuzioneRicerca.avviataIl, bloccanteDal))),
+  ]);
+  // Le righe da registrare non sono mai vuote: se non ne è entrata nessuna,
+  // un'altra esecuzione è in corso.
+  if (registrate.rows.length === 0) return { esito: "bloccata", inCorsoDal: bloccante?.il ?? bloccanteDal };
+  return {
+    esito: "aperta",
+    ricerche: registrate.rows
+      .filter((r) => r.esito === "in_corso")
+      .map((r) => ({ fonteId: Number(r.fonte_id), ricercaId: Number(r.id) })),
+  };
+}
+
+export const archivioRicerche: ArchivioEsecuzioni = {
+  fontiDaControllare,
+  apriEsecuzione,
+
+  async chiudiRicercheScadute(avviatePrima, errore) {
+    const righe = await db
+      .update(esecuzioneRicerca)
+      .set({ esito: "fallita", errore, terminataIl: sql`now()` })
+      .where(and(eq(esecuzioneRicerca.esito, "in_corso"), lt(esecuzioneRicerca.avviataIl, avviatePrima)))
+      .returning({ id: esecuzioneRicerca.id });
+    return righe.length;
+  },
+
   async ultimaRicercaRiuscita(fonteId) {
     return (await ultimaRicercaRiuscita(fonteId))?.avviataIl ?? null;
   },
 
-  async registraRicerca(r) {
-    const [riga] = await db
-      .insert(esecuzioneRicerca)
-      .values({
-        tipo: "per_fonte",
-        fonteId: r.fonteId,
-        avviataIl: r.avviataIl,
-        parallelRunId: r.parallelRunId,
-        esito: r.esito,
-        errore: r.errore,
-        terminataIl: r.esito === "in_corso" ? null : r.avviataIl,
-      })
-      .returning({ id: esecuzioneRicerca.id });
-    return riga.id;
+  async assegnaRun(ricercaId, runId) {
+    await db.update(esecuzioneRicerca).set({ parallelRunId: runId }).where(eq(esecuzioneRicerca.id, ricercaId));
   },
 
   async ricercaPerRunId(runId) {

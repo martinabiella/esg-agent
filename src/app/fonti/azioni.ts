@@ -12,6 +12,8 @@ import {
 } from "@/db/fonti";
 import { type ErroriFonte, type ValoriFonte, validaFonte } from "@/lib/fonte";
 import { idIntero } from "@/lib/id";
+import { dipendenzeAgente } from "@/lib/agente";
+import { type EsitoAvvioEsecuzione, avviaEsecuzione } from "@/lib/esecuzione";
 
 export type EsitoOperazione = "creata" | "modificata" | "eliminata";
 
@@ -35,12 +37,12 @@ const NOME_DUPLICATO = "Esiste già una Fonte con questo nome.";
 const DUPLICATA = "Esiste già una Fonte con questo URL o questo nome.";
 
 // Senza sessione l'azione non scrive. Restituisce il messaggio d'errore, o null.
-async function senzaSessione(): Promise<string | null> {
+async function senzaSessione(messaggio = NON_AUTENTICATO): Promise<string | null> {
   try {
     await utenteRichiesto();
     return null;
   } catch (e) {
-    if (e instanceof NonAutenticatoError) return NON_AUTENTICATO;
+    if (e instanceof NonAutenticatoError) return messaggio;
     throw e;
   }
 }
@@ -111,4 +113,31 @@ export async function eliminaFonteAzione(
   if (!scrittura.ok) return { errore: NON_TROVATA };
   revalidatePath("/fonti");
   return { salvato: { id, esito: "eliminata" } };
+}
+
+// ---- Pulsante «Avvia ricerca ora» ----
+
+export type StatoAvvio =
+  | Exclude<EsitoAvvioEsecuzione, { esito: "avviata" }>
+  | { esito: "avviata"; fallite: number }
+  | { esito: "errore"; messaggio: string }
+  | undefined;
+
+// La stessa esecuzione del cron del lunedì, per qualunque utente autenticato.
+// L'esito dettagliato si legge poi accanto al pulsante (ultima esecuzione).
+export async function avviaEsecuzioneAzione(): Promise<StatoAvvio> {
+  const messaggio = await senzaSessione("Sessione scaduta: accedi di nuovo per avviare la ricerca.");
+  if (messaggio) return { esito: "errore", messaggio };
+  let esito: EsitoAvvioEsecuzione;
+  try {
+    esito = await avviaEsecuzione(dipendenzeAgente());
+  } catch (e) {
+    console.error("Avvio manuale delle Ricerche non riuscito", e);
+    return {
+      esito: "errore",
+      messaggio: "L'esecuzione non è partita per un errore di configurazione o del database.",
+    };
+  }
+  revalidatePath("/fonti");
+  return esito.esito === "avviata" ? { esito: "avviata", fallite: esito.fallite } : esito;
 }

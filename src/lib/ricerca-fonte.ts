@@ -23,14 +23,8 @@ export type FonteRicerca = { id: number; nome: string; url: string; tipo: TipoFo
 // caricano il DB).
 export type EsitoRicerca = (typeof esitoRicerca.enumValues)[number];
 
-export type NuovaRicerca = {
-  fonteId: number;
-  avviataIl: Date;
-  parallelRunId: string | null;
-  esito: "in_corso" | "fallita";
-  // Compare agli utenti come motivo: italiano leggibile, niente dettagli tecnici.
-  errore: string | null;
-};
+// Una Ricerca registrata in corso, senza run, dall'esecuzione (src/lib/esecuzione.ts).
+export type RicercaRegistrata = { id: number; avviataIl: Date };
 
 // Una Notizia trovata dall'agente, pronta per il salvataggio.
 export type NotiziaDaSalvare = {
@@ -48,14 +42,16 @@ export type NotiziaDaSalvare = {
 export interface ArchivioRicerche {
   // avviata_il dell'ultima Ricerca riuscita dopo l'ultimo cambio di URL.
   ultimaRicercaRiuscita(fonteId: number): Promise<Date | null>;
-  registraRicerca(ricerca: NuovaRicerca): Promise<number>;
+  // Il run Parallel di una Ricerca registrata prima dell'avvio.
+  assegnaRun(ricercaId: number, runId: string): Promise<void>;
   ricercaPerRunId(runId: string): Promise<{ id: number; esito: EsitoRicerca } | null>;
   attiCatalogo(): Promise<AttoCatalogo[]>;
   // Atomica: salva le Notizie nuove (gli URL già presenti si saltano) con i
   // collegamenti e chiude la Ricerca come completata. null se la Ricerca non
   // era più in corso: nulla è stato scritto.
   completaRicerca(id: number, notizie: NotiziaDaSalvare[]): Promise<{ notizieCreate: number } | null>;
-  // false se la Ricerca non era più in corso.
+  // false se la Ricerca non era più in corso. `errore` compare agli utenti come
+  // motivo: italiano leggibile, niente dettagli tecnici.
   segnaFallita(id: number, errore: string): Promise<boolean>;
 }
 
@@ -113,10 +109,16 @@ function motivoAvvioFallito(e: unknown): string {
   return `Parallel non ha avviato la Ricerca: ${motivo}.`;
 }
 
-export async function avviaRicercaPerFonte(fonte: FonteRicerca, deps: DipendenzeRicerca): Promise<EsitoAvvio> {
-  const avviataIl = deps.ora();
+// Avvia su Parallel una Ricerca già registrata in corso e le assegna il run.
+// Registrarla prima evita run senza traccia nel log: se l'assegnazione del run
+// non riesce, la Ricerca resta in corso finché non scade.
+export async function avviaRicercaPerFonte(
+  fonte: FonteRicerca,
+  ricerca: RicercaRegistrata,
+  deps: DipendenzeRicerca,
+): Promise<EsitoAvvio> {
   const ultimaRiuscita = await deps.archivio.ultimaRicercaRiuscita(fonte.id);
-  const dal = finestraRicerca(ultimaRiuscita, avviataIl);
+  const dal = finestraRicerca(ultimaRiuscita, ricerca.avviataIl);
   // Fuori dal try: un errore di configurazione (URL del webhook mancante) non
   // è un problema di Parallel e non va registrato come tale.
   const richiesta: RichiestaTaskRun = {
@@ -134,38 +136,12 @@ export async function avviaRicercaPerFonte(fonte: FonteRicerca, deps: Dipendenze
   } catch (e) {
     console.error(`Avvio della Ricerca per la Fonte ${fonte.id} non riuscito`, e);
     const errore = motivoAvvioFallito(e);
-    await deps.archivio.registraRicerca({ fonteId: fonte.id, avviataIl, parallelRunId: null, esito: "fallita", errore });
+    await deps.archivio.segnaFallita(ricerca.id, errore);
     return { esito: "fallita", errore };
   }
 
-  const ricercaId = await deps.archivio.registraRicerca({
-    fonteId: fonte.id,
-    avviataIl,
-    parallelRunId: runId,
-    esito: "in_corso",
-    errore: null,
-  });
-  return { esito: "avviata", ricercaId, runId };
-}
-
-export type EsitoAvvioFonte = { fonteId: number } & EsitoAvvio;
-
-// Avvia una Ricerca per ogni Fonte, una dopo l'altra: l'errore di una Fonte,
-// anche imprevisto (per esempio il database), non ferma le altre.
-export async function avviaRicerchePerFonti(
-  fonti: readonly FonteRicerca[],
-  deps: DipendenzeRicerca,
-): Promise<EsitoAvvioFonte[]> {
-  const esiti: EsitoAvvioFonte[] = [];
-  for (const fonte of fonti) {
-    try {
-      esiti.push({ fonteId: fonte.id, ...(await avviaRicercaPerFonte(fonte, deps)) });
-    } catch (e) {
-      console.error(`Ricerca per la Fonte ${fonte.id} non avviata`, e);
-      esiti.push({ fonteId: fonte.id, esito: "fallita", errore: "Errore imprevisto: la Ricerca non è partita." });
-    }
-  }
-  return esiti;
+  await deps.archivio.assegnaRun(ricerca.id, runId);
+  return { esito: "avviata", ricercaId: ricerca.id, runId };
 }
 
 // ---- Webhook di fine run ----

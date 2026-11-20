@@ -1,5 +1,6 @@
-import { and, asc, count, desc, eq, isNotNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNotNull, max, ne, or, sql } from "drizzle-orm";
 import { db } from "./index";
+import type { FonteDaControllare } from "@/lib/esecuzione";
 import {
   type CampiFonte,
   type ControlloFonte,
@@ -80,6 +81,37 @@ export async function elencoFonti(): Promise<FonteElenco[]> {
     asc(fonte.id),
   );
   return righe.map(fonteElenco);
+}
+
+// Le Fonti per un'esecuzione delle Ricerche, con l'avvio dell'ultima Ricerca
+// partita davvero (non saltata per tetto) dopo l'ultimo cambio di URL: serve a
+// far passare davanti, quando le Fonti superano il tetto, quelle rimaste indietro.
+export async function fontiDaControllare(): Promise<FonteDaControllare[]> {
+  const ultimaPartita = db
+    .select({
+      fonteId: esecuzioneRicerca.fonteId,
+      il: max(esecuzioneRicerca.avviataIl).as("ultima_partita_il"),
+    })
+    .from(esecuzioneRicerca)
+    .innerJoin(fonte, eq(fonte.id, esecuzioneRicerca.fonteId))
+    .where(
+      and(
+        ne(esecuzioneRicerca.esito, "saltata_per_tetto"),
+        gte(esecuzioneRicerca.avviataIl, fonte.urlModificatoIl),
+      ),
+    )
+    .groupBy(esecuzioneRicerca.fonteId)
+    .as("ultima_partita");
+  return db
+    .select({
+      id: fonte.id,
+      nome: fonte.nome,
+      url: fonte.url,
+      tipo: fonte.tipo,
+      ultimaPartitaIl: ultimaPartita.il,
+    })
+    .from(fonte)
+    .leftJoin(ultimaPartita, eq(ultimaPartita.fonteId, fonte.id));
 }
 
 export async function trovaFonte(id: number): Promise<FonteDettaglio | null> {
