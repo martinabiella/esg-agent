@@ -183,16 +183,16 @@ test("un candidato senza nessun Settore del catalogo non diventa Atto, salvo che
   assert.equal(perTutti.daCreare.length, 1);
 });
 
-test("oltre 10 candidati validi per Ricerca si creano i primi 10, gli altri si scartano con il motivo", () => {
-  const molti = Array.from({ length: 12 }, (_, i) => ({
+test("oltre 20 candidati validi per Ricerca si creano i primi 20, gli altri si scartano con il motivo", () => {
+  const molti = Array.from({ length: 22 }, (_, i) => ({
     ...candidato,
     identificativoUfficiale: `3202R${1000 + i}`,
     titolo: `Regolamento numero ${i}`,
   }));
   const { daCreare, scartati } = decidiAttiNuovi(molti, [], settori, ORA);
-  assert.deepEqual(daCreare.map((a) => a.identificativoUfficiale), molti.slice(0, 10).map((c) => c.identificativoUfficiale));
-  assert.deepEqual(scartati.map((s) => s.posizione), [11, 12]);
-  assert.match(scartati[0].motivo, /tetto di 10/);
+  assert.deepEqual(daCreare.map((a) => a.identificativoUfficiale), molti.slice(0, 20).map((c) => c.identificativoUfficiale));
+  assert.deepEqual(scartati.map((s) => s.posizione), [21, 22]);
+  assert.match(scartati[0].motivo, /tetto di 20/);
 });
 
 test("un candidato già abrogato non diventa Atto: l'agente non porta nel catalogo norme che non valgono più", () => {

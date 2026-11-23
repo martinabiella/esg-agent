@@ -12,7 +12,7 @@ import type { GiurisdizioneAtto, TipoAtto } from "./tipi-atto";
 const MAX_TEMI = 5;
 // Una Ricerca non riempie il catalogo: i candidati oltre il tetto si scartano
 // (restano la Notizia e il suo flag), li riprenderà una Ricerca successiva.
-const MAX_ATTI_PER_RICERCA = 10;
+const MAX_ATTI_PER_RICERCA = 20;
 
 export type SettoreCatalogo = { id: number; nome: string };
 
