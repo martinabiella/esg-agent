@@ -539,3 +539,13 @@ test("elaboraWebhook: un run avviato con lo schema v1 è ancora leggibile, senza
   assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0 });
   assert.equal(archivio.notizie.length, 1);
 });
+
+test("avvio: le istruzioni escludono gli atti di routine su singole sostanze e gli atti abrogati", async () => {
+  const { client, deps } = conEurLex();
+
+  await avviaEsecuzione(deps);
+
+  const { input } = client.richieste[0];
+  assert.ok(input.includes("singola sostanza"), "regola sugli atti di routine");
+  assert.ok(input.includes("abrogati"), "regola sugli atti abrogati");
+});

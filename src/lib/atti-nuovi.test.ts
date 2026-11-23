@@ -194,3 +194,9 @@ test("oltre 10 candidati validi per Ricerca si creano i primi 10, gli altri si s
   assert.deepEqual(scartati.map((s) => s.posizione), [11, 12]);
   assert.match(scartati[0].motivo, /tetto di 10/);
 });
+
+test("un candidato già abrogato non diventa Atto: l'agente non porta nel catalogo norme che non valgono più", () => {
+  const { daCreare, scartati } = decidiAttiNuovi([{ ...candidato, stato: "abrogato" }], [], settori, ORA);
+  assert.deepEqual(daCreare, []);
+  assert.match(scartati[0].motivo, /abrogato/);
+});

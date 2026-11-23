@@ -92,6 +92,7 @@ export function decidiAttiNuovi(
     }
     if (esito.esito === "ambiguo") return scarta("il catalogo ha più Atti che potrebbero coincidere (ambiguo)");
 
+    if (c.stato === "abrogato") return scarta("Atto già abrogato");
     // Un Atto senza Settori non comparirebbe per nessuno: non si crea.
     const idDeiSettori = idSettori(c, settori);
     if (!c.tuttiISettori && idDeiSettori.length === 0) return scarta("nessun Settore del catalogo");
