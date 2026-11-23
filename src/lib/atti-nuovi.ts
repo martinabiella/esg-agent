@@ -10,6 +10,9 @@ import type { AttoCandidato } from "./output-ricerca";
 import type { GiurisdizioneAtto, TipoAtto } from "./tipi-atto";
 
 const MAX_TEMI = 5;
+// Una Ricerca non riempie il catalogo: i candidati oltre il tetto si scartano
+// (restano la Notizia e il suo flag), li riprenderà una Ricerca successiva.
+const MAX_ATTI_PER_RICERCA = 10;
 
 export type SettoreCatalogo = { id: number; nome: string };
 
@@ -89,6 +92,13 @@ export function decidiAttiNuovi(
     }
     if (esito.esito === "ambiguo") return scarta("il catalogo ha più Atti che potrebbero coincidere (ambiguo)");
 
+    // Un Atto senza Settori non comparirebbe per nessuno: non si crea.
+    const idDeiSettori = idSettori(c, settori);
+    if (!c.tuttiISettori && idDeiSettori.length === 0) return scarta("nessun Settore del catalogo");
+    if (daCreare.length >= MAX_ATTI_PER_RICERCA) {
+      return scarta(`oltre il tetto di ${MAX_ATTI_PER_RICERCA} Atti nuovi per Ricerca`);
+    }
+
     const validato = validaAtto({
       titolo: c.titolo,
       identificativoUfficiale: identificativo,
@@ -102,7 +112,7 @@ export function decidiAttiNuovi(
       criteriTesto: c.criteriTesto,
       soglie: c.soglie,
       tuttiISettori: c.tuttiISettori,
-      settori: idSettori(c, settori).map(String),
+      settori: idDeiSettori.map(String),
       temi: [],
     });
     if (!validato.ok) return scarta(Object.values(validato.errori).join(" "));

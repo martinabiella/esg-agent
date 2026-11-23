@@ -138,9 +138,7 @@ test("un Settore inesistente non si crea: l'Atto nasce con i soli Settori noti, 
   assert.deepEqual(daCreare[0].settori, [1, 2]);
 });
 
-test("nessun Settore che calza: l'Atto nasce senza Settori; «tutti i Settori» esclude quelli specifici", () => {
-  const nessuno = decidiAttiNuovi([{ ...candidato, settori: ["Esplorazione spaziale"] }], [], settori, ORA);
-  assert.deepEqual(nessuno.daCreare[0].settori, []);
+test("«tutti i Settori» esclude i Settori specifici", () => {
   const tutti = decidiAttiNuovi([{ ...candidato, tuttiISettori: true, settori: ["Energia"] }], [], settori, ORA);
   assert.equal(tutti.daCreare[0].tuttiISettori, true);
   assert.deepEqual(tutti.daCreare[0].settori, []);
@@ -172,4 +170,27 @@ test("se il primo candidato con un identificativo non è valido, il secondo con 
   );
   assert.equal(scartati.length, 1);
   assert.deepEqual(daCreare.map((a) => a.titolo), ["CSRD corretta"]);
+});
+
+test("un candidato senza nessun Settore del catalogo non diventa Atto, salvo che valga per tutti i Settori", () => {
+  const senzaSettori = { ...candidato, settori: ["Settore inventato"] };
+  const esito = decidiAttiNuovi([senzaSettori], [], settori, ORA);
+  assert.deepEqual(esito.daCreare, []);
+  assert.equal(esito.scartati.length, 1);
+  assert.match(esito.scartati[0].motivo, /nessun Settore/);
+
+  const perTutti = decidiAttiNuovi([{ ...senzaSettori, tuttiISettori: true }], [], settori, ORA);
+  assert.equal(perTutti.daCreare.length, 1);
+});
+
+test("oltre 10 candidati validi per Ricerca si creano i primi 10, gli altri si scartano con il motivo", () => {
+  const molti = Array.from({ length: 12 }, (_, i) => ({
+    ...candidato,
+    identificativoUfficiale: `3202R${1000 + i}`,
+    titolo: `Regolamento numero ${i}`,
+  }));
+  const { daCreare, scartati } = decidiAttiNuovi(molti, [], settori, ORA);
+  assert.deepEqual(daCreare.map((a) => a.identificativoUfficiale), molti.slice(0, 10).map((c) => c.identificativoUfficiale));
+  assert.deepEqual(scartati.map((s) => s.posizione), [11, 12]);
+  assert.match(scartati[0].motivo, /tetto di 10/);
 });
