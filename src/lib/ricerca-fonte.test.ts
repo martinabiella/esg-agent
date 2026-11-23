@@ -389,7 +389,6 @@ function candidatoOutput(modifiche: Record<string, unknown> = {}) {
     giurisdizione: "ue",
     tipo: "direttiva",
     stato: "in_vigore",
-    data_stato: "2024-07-25",
     url_testo: "https://eur-lex.europa.eu/eli/dir/2024/1760/oj",
     summary: "Obbliga le grandi imprese alla due diligence.",
     criteri_testo: "Grandi imprese.",

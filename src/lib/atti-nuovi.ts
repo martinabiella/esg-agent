@@ -6,12 +6,10 @@
 import { type CriteriSoglie, validaAtto } from "./atto";
 import { type AttoCatalogo, chiaveIdentificativo, chiaveTitoloAtto, trovaAttoCitato } from "./atto-citato";
 import { componiSummaryAgente } from "./avviso-agente";
-import { dataPlausibile } from "./notizia";
 import type { AttoCandidato } from "./output-ricerca";
 import type { GiurisdizioneAtto, TipoAtto } from "./tipi-atto";
 
 const MAX_TEMI = 5;
-const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
 
 export type SettoreCatalogo = { id: number; nome: string };
 
@@ -23,7 +21,6 @@ export type AttoDaCreare = {
   giurisdizione: GiurisdizioneAtto;
   tipo: TipoAtto;
   stato: AttoCandidato["stato"];
-  dataStato: string;
   summary: string;
   urlTesto: string | null;
   criteriTesto: string;
@@ -68,7 +65,6 @@ export function decidiAttiNuovi(
   ora: Date,
 ): DecisioneAttiNuovi {
   const oggi = ora.toISOString().slice(0, 10);
-  const domani = new Date(ora.getTime() + UN_GIORNO_MS);
   const daCreare: AttoDaCreare[] = [];
   const scartati: CandidatoScartato[] = [];
   const visti = new Set<string>();
@@ -93,14 +89,14 @@ export function decidiAttiNuovi(
     }
     if (esito.esito === "ambiguo") return scarta("il catalogo ha più Atti che potrebbero coincidere (ambiguo)");
 
-    const dataStato = c.dataStato && dataPlausibile(c.dataStato, domani) && c.dataStato <= oggi ? c.dataStato : oggi;
     const validato = validaAtto({
       titolo: c.titolo,
       identificativoUfficiale: identificativo,
       giurisdizione: c.giurisdizione,
       tipo: c.tipo,
       stato: c.stato,
-      dataStato,
+      // Lo Stato dell'agente non entra nello storico: la data serve solo a validaAtto.
+      dataStato: oggi,
       summary: componiSummaryAgente(c.summary, { daNotizia: c.daNotizia, discrepanze: c.discrepanze }),
       urlTesto: c.urlTesto ?? "",
       criteriTesto: c.criteriTesto,
@@ -119,7 +115,6 @@ export function decidiAttiNuovi(
       giurisdizione: v.giurisdizione,
       tipo: v.tipo,
       stato: v.stato,
-      dataStato: v.dataStato,
       summary: v.summary,
       urlTesto: v.urlTesto,
       criteriTesto: v.criteriTesto,

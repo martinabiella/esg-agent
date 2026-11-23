@@ -91,10 +91,6 @@ const attoCandidato = z
         "Tipo dell'atto. UE: regolamento, direttiva, decisione. Italia: legge, decreto_legislativo, decreto, disegno_di_legge. altro se nessuno calza",
       ),
     stato: z.enum(STATI_ATTO).describe("Stato attuale dell'iter dell'atto"),
-    data_stato: z
-      .string()
-      .nullable()
-      .describe("Data in cui l'atto ha raggiunto lo stato indicato, AAAA-MM-GG; null se non la conosci"),
     url_testo: z.string().nullable().describe("URL del testo ufficiale dell'atto; null se non lo trovi"),
     summary: z.string().describe("Riassunto in italiano di 2-4 frasi: cosa prevede l'atto e per chi"),
     criteri_testo: z
@@ -158,7 +154,6 @@ export type AttoCandidato = {
   giurisdizione: GiurisdizioneAtto;
   tipo: TipoAtto;
   stato: (typeof STATI_ATTO)[number];
-  dataStato: string | null;
   urlTesto: string | null;
   summary: string;
   criteriTesto: string;
@@ -257,7 +252,6 @@ function candidatoPulito(c: z.infer<typeof attoCandidato>): AttoCandidato {
     giurisdizione: c.giurisdizione,
     tipo: c.tipo,
     stato: c.stato,
-    dataStato: testoOpzionale(c.data_stato),
     urlTesto: testoOpzionale(c.url_testo),
     summary: c.summary.trim(),
     criteriTesto: c.criteri_testo.trim(),

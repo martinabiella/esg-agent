@@ -141,7 +141,6 @@ const candidatoValido = {
   giurisdizione: "ue",
   tipo: "direttiva",
   stato: "in_vigore",
-  data_stato: "2022-12-16",
   url_testo: " https://eur-lex.europa.eu/eli/dir/2022/2464/oj ",
   summary: " Estende la rendicontazione di sostenibilità. ",
   criteri_testo: " Grandi imprese. ",
@@ -163,7 +162,6 @@ test("validaOutputRicerca: un candidato Atto valido arriva ripulito accanto alle
       giurisdizione: "ue",
       tipo: "direttiva",
       stato: "in_vigore",
-      dataStato: "2022-12-16",
       urlTesto: "https://eur-lex.europa.eu/eli/dir/2022/2464/oj",
       summary: "Estende la rendicontazione di sostenibilità.",
       criteriTesto: "Grandi imprese.",
@@ -201,7 +199,7 @@ test("validaOutputRicerca: senza atti_candidati l'output vale come senza candida
 test("schemaOutputParallel: chiede i candidati Atto con i campi validati da validaOutputRicerca", () => {
   const schema = schemaOutputParallel() as { properties: { atti_candidati: { items: { properties: Nodo } } } };
   assert.deepEqual(Object.keys(schema.properties.atti_candidati.items.properties).sort(), [
-    "criteri_testo", "da_notizia", "data_stato", "discrepanze", "giurisdizione", "identificativo_ufficiale",
+    "criteri_testo", "da_notizia", "discrepanze", "giurisdizione", "identificativo_ufficiale",
     "settori", "soglie", "stato", "summary", "temi", "tipo", "titolo", "tutti_i_settori", "url_testo",
   ]);
 });

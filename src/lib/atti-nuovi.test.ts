@@ -17,7 +17,6 @@ const candidato: AttoCandidato = {
   giurisdizione: "ue",
   tipo: "direttiva",
   stato: "in_vigore",
-  dataStato: "2022-12-16",
   urlTesto: "https://eur-lex.europa.eu/eli/dir/2022/2464/oj",
   summary: "Estende la rendicontazione di sostenibilità.",
   criteriTesto: "Grandi imprese.",
@@ -49,7 +48,6 @@ test("un candidato nuovo con identificativo diventa un Atto da creare, con origi
       giurisdizione: "ue",
       tipo: "direttiva",
       stato: "in_vigore",
-      dataStato: "2022-12-16",
       summary: "[Agente] Dati presi da: https://www.esempio.it/omnibus\n\nEstende la rendicontazione di sostenibilità.",
       urlTesto: "https://eur-lex.europa.eu/eli/dir/2022/2464/oj",
       criteriTesto: "Grandi imprese.",
@@ -164,12 +162,6 @@ test("lo stesso Atto proposto due volte nell'output si crea una volta sola", () 
   assert.deepEqual(daCreare.map((a) => a.titolo), ["Direttiva CSRD"]);
 });
 
-test("senza data dello Stato, o con una data non reale o futura, vale la data di oggi", () => {
-  for (const dataStato of [null, "2026-02-30", "2027-01-01"]) {
-    const { daCreare } = decidiAttiNuovi([{ ...candidato, dataStato }], [], settori, ORA);
-    assert.equal(daCreare[0].dataStato, "2026-11-19", String(dataStato));
-  }
-});
 
 test("se il primo candidato con un identificativo non è valido, il secondo con lo stesso identificativo si prova", () => {
   const { daCreare, scartati } = decidiAttiNuovi(

@@ -76,7 +76,7 @@ export async function ultimaEsecuzione(): Promise<UltimaEsecuzione | null> {
 // due Ricerche che propongono lo stesso Atto ne creano uno. Un Atto nuovo nasce
 // con Criteri non confermati e Stato non confermato, da una Fonte; solo gli
 // Atti nati qui ricevono Settori (esistenti), Temi (creati se mancano, senza
-// distinguere le maiuscole) e storico dello Stato. Si collegano alle Notizie
+// distinguere le maiuscole); lo Stato dell'agente non entra nello storico. Si collegano alle Notizie
 // solo Atti che esistono ancora e non sono Non rilevanti.
 async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: AttoDaCreare[]) {
   const righe = notizie.map((n) => ({
@@ -95,7 +95,6 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: At
     giurisdizione: a.giurisdizione,
     tipo: a.tipo,
     stato: a.stato,
-    data_stato: a.dataStato,
     summary: a.summary,
     url_testo: a.urlTesto,
     criteri_soglie: a.criteriSoglie,
@@ -112,7 +111,7 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: At
     ), dati_atti AS (
       SELECT * FROM jsonb_to_recordset(${JSON.stringify(righeAtti)}::jsonb) AS a(
         identificativo text, titolo text, giurisdizione giurisdizione, tipo tipo_atto, stato stato,
-        data_stato date, summary text, url_testo text, criteri_soglie jsonb, criteri_testo text,
+        summary text, url_testo text, criteri_soglie jsonb, criteri_testo text,
         tutti_i_settori boolean, settori int[], temi text[]
       )
     ), atti_nuovi AS (
@@ -151,11 +150,6 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: At
       JOIN (SELECT id, nome FROM tema UNION ALL SELECT id, nome FROM temi_nuovi) t
         ON lower(t.nome) = lower(x.nome)
       ON CONFLICT DO NOTHING
-    ), inserisci_storico AS (
-      INSERT INTO stato_storico (atto_id, stato, data)
-      SELECT an.id, a.stato, a.data_stato
-      FROM atti_nuovi an
-      JOIN dati_atti a ON a.identificativo = an.identificativo_ufficiale
     ), dati AS (
       SELECT * FROM jsonb_to_recordset(${JSON.stringify(righe)}::jsonb) AS n(
         titolo text, fonte text, data date, url text, riassunto text,
