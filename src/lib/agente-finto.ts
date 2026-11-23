@@ -1,10 +1,11 @@
 // Solo per i test: client Parallel e archivio delle Ricerche in memoria, con le
 // stesse regole del database (src/db/ricerche.ts).
 
-import type { AttoCatalogo } from "./atto-citato";
+import type { AttoDaCreare } from "./atti-nuovi";
+import { type AttoCatalogo, chiaveIdentificativo } from "./atto-citato";
 import type { ArchivioEsecuzioni, DipendenzeEsecuzione, FonteDaControllare, NuovaEsecuzione } from "./esecuzione";
 import type { ClientParallel, RichiestaTaskRun, RisultatoTaskRun } from "./parallel";
-import type { EsitoRicerca, NotiziaDaSalvare } from "./ricerca-fonte";
+import type { EsitoRicerca, NotiziaDaSalvare, SettoreConDescrizione } from "./ricerca-fonte";
 
 export const ORA = new Date("2026-11-19T06:00:00Z");
 
@@ -16,9 +17,11 @@ export type RicercaFinta = {
   esito: EsitoRicerca;
   errore: string | null;
   notizieCreate: number;
+  attiCreati: number;
 };
 
-export type NotiziaFinta = NotiziaDaSalvare & { id: number };
+// Salvata: i collegamenti agli Atti nuovi sono già risolti in `atti`.
+export type NotiziaFinta = Omit<NotiziaDaSalvare, "attiNuovi"> & { id: number };
 
 export class ArchivioFinto implements ArchivioEsecuzioni {
   fonti: FonteDaControllare[] = [];
@@ -26,6 +29,10 @@ export class ArchivioFinto implements ArchivioEsecuzioni {
   notizie: NotiziaFinta[] = [];
   ultimaRiuscita = new Map<number, Date>();
   atti: AttoCatalogo[] = [];
+  settori: SettoreConDescrizione[] = [];
+  temi: string[] = [];
+  // Gli Atti nati da una Ricerca, con la Fonte di origine.
+  attiCreati: (AttoDaCreare & { id: number; fonteId: number })[] = [];
 
   async fontiDaControllare() {
     return this.fonti;
@@ -40,7 +47,7 @@ export class ArchivioFinto implements ArchivioEsecuzioni {
     }
     const registra = (fonteId: number, esito: EsitoRicerca) => {
       const id = this.ricerche.length + 1;
-      this.ricerche.push({ id, fonteId, avviataIl, parallelRunId: null, esito, errore: null, notizieCreate: 0 });
+      this.ricerche.push({ id, fonteId, avviataIl, parallelRunId: null, esito, errore: null, notizieCreate: 0, attiCreati: 0 });
       return { fonteId, ricercaId: id };
     };
     const ricerche = daAvviare.map((fonteId) => registra(fonteId, "in_corso"));
@@ -67,15 +74,51 @@ export class ArchivioFinto implements ArchivioEsecuzioni {
   async attiCatalogo() {
     return this.atti;
   }
-  // Come il DB: solo se la Ricerca è ancora in corso, e un URL già presente non
-  // crea una seconda Notizia (vincolo unique su notizia.url).
-  async completaRicerca(id: number, notizie: NotiziaDaSalvare[]) {
+  async settoriCatalogo() {
+    return this.settori;
+  }
+  async nomiTemi() {
+    return this.temi;
+  }
+  // Come il DB: solo se la Ricerca è ancora in corso. Un URL già presente non
+  // crea una seconda Notizia (vincolo unique su notizia.url); un identificativo
+  // già presente non crea un secondo Atto (unique su identificativo_ufficiale);
+  // i Temi nuovi si creano senza distinguere le maiuscole; i Settori mai.
+  async completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: AttoDaCreare[]) {
     const r = this.ricerche.find((x) => x.id === id);
     if (!r || r.esito !== "in_corso") return null;
+
+    const nuoviAtti = atti.filter(
+      (a) => !this.atti.some((e) => e.identificativoUfficiale && chiaveIdentificativo(e.identificativoUfficiale) === chiaveIdentificativo(a.identificativoUfficiale)),
+    );
+    for (const a of nuoviAtti) {
+      const nuovo = { ...a, id: this.atti.length + 1, fonteId: r.fonteId };
+      this.attiCreati.push(nuovo);
+      this.atti.push({
+        id: nuovo.id,
+        titolo: a.titolo,
+        identificativoUfficiale: a.identificativoUfficiale,
+        giurisdizione: a.giurisdizione,
+        nonRilevante: false,
+      });
+      for (const t of a.temi) {
+        if (!this.temi.some((e) => e.toLowerCase() === t.toLowerCase())) this.temi.push(t);
+      }
+    }
+
     const nuove = notizie.filter((n) => !this.notizie.some((e) => e.url === n.url));
-    for (const n of nuove) this.notizie.push({ ...n, id: this.notizie.length + 1 });
-    Object.assign(r, { esito: "completata", notizieCreate: nuove.length });
-    return { notizieCreate: nuove.length };
+    for (const { attiNuovi, ...n } of nuove) {
+      const daNuovi = this.atti.filter(
+        (a) =>
+          !a.nonRilevante &&
+          a.identificativoUfficiale !== null &&
+          attiNuovi.some((i) => chiaveIdentificativo(i) === chiaveIdentificativo(a.identificativoUfficiale ?? "")),
+      );
+      const collegati = [...new Set([...n.atti, ...daNuovi.map((a) => a.id)])];
+      this.notizie.push({ ...n, atti: collegati, id: this.notizie.length + 1 });
+    }
+    Object.assign(r, { esito: "completata", notizieCreate: nuove.length, attiCreati: nuoviAtti.length });
+    return { notizieCreate: nuove.length, attiCreati: nuoviAtti.length };
   }
   async segnaFallita(id: number, errore: string) {
     const r = this.ricerche.find((x) => x.id === id);

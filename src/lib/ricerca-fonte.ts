@@ -5,9 +5,16 @@
 
 import { z } from "zod";
 import type { esitoRicerca } from "../db/schema";
-import { type AttoCatalogo, trovaAttoCitato } from "./atto-citato";
+import { type AttoDaCreare, type SettoreCatalogo, decidiAttiNuovi } from "./atti-nuovi";
+import { type AttoCatalogo, chiaveIdentificativo, trovaAttoCitato } from "./atto-citato";
 import type { TipoFonte } from "./fonte";
-import { type NotiziaTrovata, VERSIONE_OUTPUT, schemaOutputParallel, validaOutputRicerca } from "./output-ricerca";
+import {
+  type NotiziaTrovata,
+  VERSIONE_OUTPUT,
+  VERSIONI_LEGGIBILI,
+  schemaOutputParallel,
+  validaOutputRicerca,
+} from "./output-ricerca";
 import { type ClientParallel, ErroreParallel, type RichiestaTaskRun } from "./parallel";
 
 const GIORNI_PRIMA_RICERCA = 30;
@@ -36,7 +43,13 @@ export type NotiziaDaSalvare = {
   riassunto: string;
   segnalaNovita: boolean;
   atti: number[];
+  // Identificativi di Atti che questa stessa scrittura crea (AttoDaCreare):
+  // la Notizia si collega anche a loro.
+  attiNuovi: string[];
 };
+
+// Un Settore del catalogo, con la descrizione che aiuta l'agente a sceglierlo.
+export type SettoreConDescrizione = SettoreCatalogo & { descrizione: string };
 
 // Le letture e scritture sul database che servono alle Ricerche.
 export interface ArchivioRicerche {
@@ -46,10 +59,18 @@ export interface ArchivioRicerche {
   assegnaRun(ricercaId: number, runId: string): Promise<void>;
   ricercaPerRunId(runId: string): Promise<{ id: number; esito: EsitoRicerca } | null>;
   attiCatalogo(): Promise<AttoCatalogo[]>;
-  // Atomica: salva le Notizie nuove (gli URL già presenti si saltano) con i
-  // collegamenti e chiude la Ricerca come completata. null se la Ricerca non
-  // era più in corso: nulla è stato scritto.
-  completaRicerca(id: number, notizie: NotiziaDaSalvare[]): Promise<{ notizieCreate: number } | null>;
+  settoriCatalogo(): Promise<SettoreConDescrizione[]>;
+  nomiTemi(): Promise<string[]>;
+  // Atomica: crea gli Atti nuovi (quelli con identificativo già presente si
+  // saltano) con Settori, Temi e storico dello Stato, salva le Notizie nuove
+  // (gli URL già presenti si saltano) con i collegamenti e chiude la Ricerca
+  // come completata. null se la Ricerca non era più in corso: nulla è stato
+  // scritto.
+  completaRicerca(
+    id: number,
+    notizie: NotiziaDaSalvare[],
+    atti: AttoDaCreare[],
+  ): Promise<{ notizieCreate: number; attiCreati: number } | null>;
   // false se la Ricerca non era più in corso. `errore` compare agli utenti come
   // motivo: italiano leggibile, niente dettagli tecnici.
   segnaFallita(id: number, errore: string): Promise<boolean>;
@@ -77,7 +98,12 @@ function dominio(url: string): string {
   return new URL(url).hostname.replace(/^www\./, "");
 }
 
-function istruzioni(fonte: FonteRicerca, dal: string): string {
+function istruzioni(
+  fonte: FonteRicerca,
+  dal: string,
+  settori: readonly SettoreConDescrizione[],
+  temi: readonly string[],
+): string {
   const tipo = fonte.tipo === "ufficiale" ? "una fonte ufficiale" : "una fonte editoriale";
   return [
     `Sei un analista di normativa di sostenibilità (ESG) per un team di consulenza italiano.`,
@@ -85,6 +111,12 @@ function istruzioni(fonte: FonteRicerca, dal: string): string {
     `Elenca gli articoli, i comunicati e le pagine pubblicati da questa fonte dal ${dal} a oggi che riguardano normativa di sostenibilità dell'Unione europea o italiana: proposte, direttive, regolamenti, decisioni, leggi, decreti, disegni di legge, il loro iter, recepimenti, rinvii e modifiche.`,
     `Ignora i contenuti che non riguardano normativa di sostenibilità.`,
     `Per ogni articolo riporta gli atti normativi citati con il loro identificativo ufficiale (CELEX, COM, numero e anno), anche se l'articolo non lo scrive, purché tu ne sia certo. Non riportare come atti rapporti, consultazioni o documenti di lavoro.`,
+    `Elenca in atti_candidati ogni atto normativo con identificativo ufficiale citato negli articoli, una sola volta anche se citato in più articoli, con i dati ricavati dal testo ufficiale quando lo trovi. Se due articoli sono in disaccordo su un dato (per esempio lo Stato), scegli la versione della fonte più autorevole e descrivi il disaccordo in discrepanze, indicando chi dice cosa. In da_notizia metti l'URL dell'articolo da cui hai preso i dati.`,
+    `Per i settori usa solo i nomi di questo elenco, mai nomi nuovi; se nessuno calza lascia l'elenco vuoto, e usa tutti_i_settori solo se l'atto vale per tutta l'economia:`,
+    ...settori.map((s) => `- ${s.nome}${s.descrizione ? `: ${s.descrizione}` : ""}`),
+    ...(temi.length > 0
+      ? [`Per i temi riusa quando possono calzare i nomi già in uso: ${temi.join(", ")}. Aggiungine di nuovi solo se nessuno calza.`]
+      : []),
   ].join("\n");
 }
 
@@ -121,12 +153,16 @@ export async function avviaRicercaPerFonte(
   ricerca: RicercaRegistrata,
   deps: DipendenzeRicerca,
 ): Promise<EsitoAvvio> {
-  const ultimaRiuscita = await deps.archivio.ultimaRicercaRiuscita(fonte.id);
+  const [ultimaRiuscita, settori, temi] = await Promise.all([
+    deps.archivio.ultimaRicercaRiuscita(fonte.id),
+    deps.archivio.settoriCatalogo(),
+    deps.archivio.nomiTemi(),
+  ]);
   const dal = finestraRicerca(ultimaRiuscita, ricerca.avviataIl);
   // Fuori dal try: un errore di configurazione (URL del webhook mancante) non
   // è un problema di Parallel e non va registrato come tale.
   const richiesta: RichiestaTaskRun = {
-    input: istruzioni(fonte, dal),
+    input: istruzioni(fonte, dal, settori, temi),
     processor: PROCESSORE,
     task_spec: { output_schema: { type: "json", json_schema: schemaOutputParallel() } },
     source_policy: { include_domains: [dominio(fonte.url)], after_date: dal },
@@ -158,7 +194,7 @@ export async function avviaRicercaPerFonte(
 
 export type EsitoWebhook =
   // notizieScartate: Notizie dell'output che non superavano i controlli.
-  | { esito: "completata"; notizieCreate: number; notizieScartate: number }
+  | { esito: "completata"; notizieCreate: number; notizieScartate: number; attiCreati: number }
   | { esito: "fallita"; errore: string }
   // Evento che non riguarda una Ricerca da chiudere: si conferma e basta.
   | { esito: "ignorato"; motivo: string }
@@ -183,14 +219,26 @@ function senzaDoppioni(notizie: readonly NotiziaTrovata[]): NotiziaTrovata[] {
 // una novità, così non entra nell'Avviso di conferma.
 // «Pubblicata da»: l'editore indicato dall'agente, altrimenti il nome della
 // Fonte (o, se manca anche quello, il dominio della Notizia).
+// Un Atto che questa stessa scrittura crea conta come novità: la Notizia che lo
+// cita mantiene il flag e si collega al nuovo Atto (via attiNuovi).
 function notizieDaSalvare(
   notizie: readonly NotiziaTrovata[],
   atti: readonly AttoCatalogo[],
   nomeFonte: string,
+  daCreare: readonly AttoDaCreare[],
 ): NotiziaDaSalvare[] {
+  const nuovi = new Map(daCreare.map((a) => [chiaveIdentificativo(a.identificativoUfficiale), a.identificativoUfficiale]));
   return senzaDoppioni(notizie).map((n) => {
     const esiti = n.attiCitati.map((c) => trovaAttoCitato(c, atti));
     const collegati = esiti.flatMap((e) => (e.esito === "collegato" ? [e.attoId] : []));
+    const attiNuovi = [
+      ...new Set(
+        n.attiCitati.flatMap((c) => {
+          const nuovo = c.identificativoUfficiale ? nuovi.get(chiaveIdentificativo(c.identificativoUfficiale.trim())) : undefined;
+          return nuovo ? [nuovo] : [];
+        }),
+      ),
+    ];
     const daControllare = esiti.some(
       (e, i) => e.esito === "ambiguo" || (e.esito === "assente" && n.attiCitati[i].identificativoUfficiale !== null),
     );
@@ -203,6 +251,7 @@ function notizieDaSalvare(
       riassunto: n.riassunto,
       segnalaNovita: !soloNonRilevanti && (n.segnalaNovita || daControllare),
       atti: [...new Set(collegati)],
+      attiNuovi,
     };
   });
 }
@@ -256,7 +305,9 @@ export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): 
   }
 
   const risultato = await deps.client.risultatoTaskRun(runId);
-  if (risultato.metadata?.versione_schema !== VERSIONE_OUTPUT) {
+  // Un run avviato con la versione precedente e concluso dopo il deploy resta
+  // leggibile: la v1 è una v2 senza candidati.
+  if (!VERSIONI_LEGGIBILI.some((v) => v === risultato.metadata?.versione_schema)) {
     return fallita(
       `La Ricerca è stata avviata con un'altra versione dello schema dei risultati (ora v${VERSIONE_OUTPUT}): il risultato non è stato letto.`,
     );
@@ -270,10 +321,26 @@ export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): 
   // Il nome viaggia nei metadati del run: la Fonte potrebbe essere stata
   // eliminata o rinominata nel frattempo.
   const nomeFonte = String(risultato.metadata?.fonte_nome ?? "");
-  const atti = await deps.archivio.attiCatalogo();
+  for (const s of output.candidatiScartati) {
+    console.warn(`Run Parallel ${runId}: candidato Atto ${s.posizione} scartato (${s.motivo})`);
+  }
+  const [atti, settori] = await Promise.all([deps.archivio.attiCatalogo(), deps.archivio.settoriCatalogo()]);
+  const { daCreare, scartati } = decidiAttiNuovi(output.candidati, atti, settori, deps.ora());
+  for (const s of scartati) {
+    console.warn(`Run Parallel ${runId}: «${s.titolo}» non diventa un Atto (${s.motivo})`);
+  }
   // Un altro recapito dello stesso evento può averla chiusa nel frattempo.
-  const scritto = await deps.archivio.completaRicerca(ricerca.id, notizieDaSalvare(output.notizie, atti, nomeFonte));
+  const scritto = await deps.archivio.completaRicerca(
+    ricerca.id,
+    notizieDaSalvare(output.notizie, atti, nomeFonte, daCreare),
+    daCreare,
+  );
   return scritto
-    ? { esito: "completata", notizieCreate: scritto.notizieCreate, notizieScartate: output.scartate.length }
+    ? {
+        esito: "completata",
+        notizieCreate: scritto.notizieCreate,
+        notizieScartate: output.scartate.length,
+        attiCreati: scritto.attiCreati,
+      }
     : GIA_ELABORATA;
 }

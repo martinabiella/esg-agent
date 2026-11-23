@@ -157,6 +157,7 @@ export type RicercaDellEsecuzione = {
   fonte: string | null;
   esito: EsitoRicerca;
   notizieCreate: number;
+  attiCreati: number;
 };
 
 export type UltimaEsecuzione = { avviataIl: Date; ricerche: RicercaDellEsecuzione[] };
@@ -190,9 +191,10 @@ export function esitoEsecuzione({ avviataIl, ricerche }: UltimaEsecuzione, ora: 
     const completate = partite.filter((r) => r.esito === "completata");
     const fallite = partite.filter((r) => r.esito === "fallita");
     const notizie = completate.reduce((somma, r) => somma + r.notizieCreate, 0);
+    const attiNuovi = completate.reduce((somma, r) => somma + r.attiCreati, 0);
     stato = fallite.length > 0 || inCorso.length > 0 ? "fonti_non_leggibili" : "completata";
     frasi.push(
-      `${quante(completate.length, "Fonte controllata", "Fonti controllate")}, ${quante(notizie, "Notizia nuova", "Notizie nuove")}.`,
+      `${quante(completate.length, "Fonte controllata", "Fonti controllate")}, ${quante(notizie, "Notizia nuova", "Notizie nuove")}, ${quante(attiNuovi, "Atto nuovo", "Atti nuovi")}.`,
     );
     if (fallite.length > 0) frasi.push(`Non leggibili: ${nomi(fallite)}.`);
     if (inCorso.length > 0) frasi.push(`Senza risposta: ${nomi(inCorso)}.`);

@@ -64,6 +64,10 @@ _Avoid_: Aggiornamento, alert, coda di revisione
 Indicazione dell'origine di un contenuto di un Atto normativo: *dalla fonte ufficiale*, *generato dall'agente* o *confermato da una persona*. Vale per gli Atti, non per le Notizie: il riassunto di una Notizia può restare non verificato.
 _Avoid_: Fonte, stato di verifica
 
+**Avviso dell'agente**:
+Le righe che l'agente scrive in testa al summary di un Atto che ha creato: da quale articolo ha preso i dati e, se gli articoli trovati sono in disaccordo su un dato (per esempio lo Stato), che cosa dicono. La scheda dell'Atto le mostra in un riquadro a parte; una persona le toglie cancellando le righe dal summary. Non è una Notizia né un Avviso di conferma.
+_Avoid_: Nota, warning
+
 **Avviso di conferma**:
 Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona, più i cambi di Stato rilevati dall'agente e le Notizie che segnalano una novità (modifiche a Atti esistenti o nuove normative, con la possibilità di creare l'Atto dalla Notizia). Una Notizia esce dall'avviso quando una persona la segna come controllata. Non blocca nulla.
 _Avoid_: Notifica, coda di revisione, task

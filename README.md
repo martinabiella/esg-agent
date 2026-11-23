@@ -76,6 +76,16 @@ La rotta del webhook è esclusa dal proxy: si autentica con la firma, non con la
 
 Il webhook non raggiunge `localhost`: in locale si prova con il client finto dei test (`npm test`).
 
+### Atti nuovi dall'agente
+
+Oltre alle Notizie, l'output (schema v2) ha `atti_candidati`: un candidato per ogni atto con identificativo ufficiale citato negli articoli. `decidiAttiNuovi` (`src/lib/atti-nuovi.ts`, pura) decide quali diventano Atti, e `completaRicerca` (`src/db/ricerche.ts`) li scrive in un'unica istruzione insieme alle Notizie.
+- **Si crea l'Atto** solo con un identificativo ufficiale, se il catalogo non lo ha già (`trovaAttoCitato`: identificativo, poi titolo e Giurisdizione), se non è ambiguo, se non è un Atto Non rilevante e se supera `validaAtto` (Tipo coerente con la Giurisdizione, date, Soglie). Altrimenti non si crea nulla, il motivo va nel log del server e la Notizia resta col flag.
+- **Come nasce.** Provenienza `agente`, Criteri non confermati, `fonte_id` della Fonte, `stato_confermato_il` vuoto.
+- **Settori e Temi.** I Settori sono solo quelli esistenti (Parallel riceve nelle istruzioni l'elenco con le descrizioni; i nomi che non esistono si scartano). I Temi nuovi si creano, con nome unico senza distinguere le maiuscole. Al massimo 5 Temi per Atto.
+- **Origine e disaccordi** stanno in testa al summary (`src/lib/avviso-agente.ts`) e la scheda dell'Atto li mostra in riquadri a parte.
+- **Una Notizia che cita un Atto appena creato** si collega a lui e mantiene il flag di novità.
+- **Schema v2.** I run avviati con la v1 e conclusi dopo il deploy si leggono ancora (senza candidati).
+
 ### Esecuzione settimanale e pulsante
 
 Un'Esecuzione parte in due modi:
