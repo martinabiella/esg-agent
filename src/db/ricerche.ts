@@ -9,6 +9,7 @@ import type {
   UltimaEsecuzione,
 } from "@/lib/esecuzione";
 import type { AttoDaCreare } from "@/lib/atti-nuovi";
+import type { CambioApplicato } from "@/lib/cambi-di-stato";
 import type { NotiziaDaSalvare } from "@/lib/ricerca-fonte";
 
 export type Ricerca = typeof esecuzioneRicerca.$inferSelect;
@@ -78,7 +79,13 @@ export async function ultimaEsecuzione(): Promise<UltimaEsecuzione | null> {
 // Atti nati qui ricevono Settori (esistenti), Temi (creati se mancano, senza
 // distinguere le maiuscole); lo Stato dell'agente non entra nello storico. Si collegano alle Notizie
 // solo Atti che esistono ancora e non sono Non rilevanti.
-async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: AttoDaCreare[]) {
+async function completaRicerca(
+  id: number,
+  notizie: NotiziaDaSalvare[],
+  atti: AttoDaCreare[],
+  cambi: CambioApplicato[],
+) {
+  const righeCambi = cambi.map((c) => ({ atto_id: c.attoId, stato: c.stato, data: c.data }));
   const righe = notizie.map((n) => ({
     titolo: n.titolo,
     fonte: n.pubblicataDa,
@@ -103,11 +110,35 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: At
     settori: a.settori,
     temi: a.temi,
   }));
-  const risultato = await db.execute<{ notizie_create: number; atti_creati: number }>(sql`
+  const risultato = await db.execute<{ notizie_create: number; atti_creati: number; cambi_di_stato: number }>(sql`
     WITH ricerca_bloccata AS (
       SELECT id, fonte_id FROM esecuzione_ricerca
       WHERE id = ${id} AND esito = 'in_corso'
       FOR UPDATE
+    ), dati_cambi AS (
+      SELECT * FROM jsonb_to_recordset(${JSON.stringify(righeCambi)}::jsonb) AS c(atto_id int, stato stato, data date)
+    ), atti_bloccati AS (
+      SELECT a.id, a.stato FROM atto_normativo a
+      WHERE a.id IN (SELECT atto_id FROM dati_cambi) AND NOT a.non_rilevante AND a.stato <> 'abrogato'
+        AND EXISTS (SELECT 1 FROM ricerca_bloccata)
+      FOR UPDATE
+    ), cambi_validi AS (
+      SELECT c.* FROM dati_cambi c
+      JOIN atti_bloccati a ON a.id = c.atto_id
+      WHERE c.data > COALESCE((SELECT max(s.data) FROM stato_storico s WHERE s.atto_id = c.atto_id), '-infinity'::date)
+    ), storico_nuovo AS (
+      INSERT INTO stato_storico (atto_id, stato, data, provenienza)
+      SELECT atto_id, stato, data, 'agente'::provenienza FROM cambi_validi
+      ON CONFLICT (atto_id, stato, data) DO NOTHING
+      RETURNING atto_id, stato, data
+    ), stato_aggiornato AS (
+      UPDATE atto_normativo a
+      SET stato = u.stato, stato_confermato_il = now(), aggiornato_il = now()
+      FROM (
+        SELECT DISTINCT ON (atto_id) atto_id, stato FROM storico_nuovo ORDER BY atto_id, data DESC
+      ) u
+      WHERE a.id = u.atto_id
+      RETURNING a.id
     ), dati_atti AS (
       SELECT * FROM jsonb_to_recordset(${JSON.stringify(righeAtti)}::jsonb) AS a(
         identificativo text, titolo text, giurisdizione giurisdizione, tipo tipo_atto, stato stato,
@@ -188,10 +219,16 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: At
         notizie_create = (SELECT count(*) FROM nuove),
         atti_creati = (SELECT count(*) FROM atti_nuovi)
     WHERE id IN (SELECT id FROM ricerca_bloccata)
-    RETURNING notizie_create, atti_creati
+    RETURNING notizie_create, atti_creati, (SELECT count(*) FROM stato_aggiornato) AS cambi_di_stato
   `);
   const [riga] = risultato.rows;
-  return riga ? { notizieCreate: Number(riga.notizie_create), attiCreati: Number(riga.atti_creati) } : null;
+  return riga
+    ? {
+        notizieCreate: Number(riga.notizie_create),
+        attiCreati: Number(riga.atti_creati),
+        cambiDiStato: Number(riga.cambi_di_stato),
+      }
+    : null;
 }
 
 // Un'Esecuzione alla volta: il lock consultivo, preso nella stessa
@@ -272,6 +309,16 @@ export const archivioRicerche: ArchivioEsecuzioni = {
         identificativoUfficiale: attoNormativo.identificativoUfficiale,
         giurisdizione: attoNormativo.giurisdizione,
         nonRilevante: attoNormativo.nonRilevante,
+      })
+      .from(attoNormativo);
+  },
+
+  async statiAtti() {
+    return db
+      .select({
+        attoId: attoNormativo.id,
+        stato: attoNormativo.stato,
+        ultimaDataStato: sql<string | null>`(SELECT max(s.data) FROM stato_storico s WHERE s.atto_id = ${attoNormativo.id})`,
       })
       .from(attoNormativo);
   },

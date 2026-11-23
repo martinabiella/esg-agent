@@ -126,14 +126,22 @@ export const attoNormativo = pgTable("atto_normativo", {
   aggiornatoIl: timestamp("aggiornato_il").notNull().defaultNow(),
 });
 
-export const statoStorico = pgTable("stato_storico", {
-  id: serial("id").primaryKey(),
-  attoId: integer("atto_id")
-    .notNull()
-    .references(() => attoNormativo.id, { onDelete: "cascade" }),
-  stato: stato("stato").notNull(),
-  data: date("data").notNull(),
-});
+export const statoStorico = pgTable(
+  "stato_storico",
+  {
+    id: serial("id").primaryKey(),
+    attoId: integer("atto_id")
+      .notNull()
+      .references(() => attoNormativo.id, { onDelete: "cascade" }),
+    stato: stato("stato").notNull(),
+    data: date("data").notNull(),
+    // Chi ha registrato il cambio: «agente» per quelli rilevati da una Fonte ufficiale.
+    provenienza: provenienza("provenienza").notNull().default("persona"),
+    // Quando una persona ha visto il cambio dell'agente (Avviso di conferma): null = non visto.
+    vistoIl: timestamp("visto_il"),
+  },
+  (t) => [uniqueIndex("stato_storico_atto_stato_data_idx").on(t.attoId, t.stato, t.data)],
+);
 
 export const relazioneAtti = pgTable(
   "relazione_atti",

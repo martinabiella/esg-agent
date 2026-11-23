@@ -50,6 +50,13 @@
       "when": 1795088116595,
       "tag": "0006_chemical_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795448030835,
+      "tag": "0007_cambi_di_stato_agente",
+      "breakpoints": true
     }
   ]
 }

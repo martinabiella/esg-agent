@@ -31,6 +31,8 @@ test("validaOutputRicerca: un output valido diventa l'elenco delle Notizie trova
     scartate: [],
     candidati: [],
     candidatiScartati: [],
+    cambiDiStato: [],
+    cambiScartati: [],
   });
 });
 
@@ -38,7 +40,7 @@ test("validaOutputRicerca: senza l'elenco delle Notizie l'output non è valido, 
   for (const contenuto of [null, "testo", { notizie: "x" }, {}]) {
     const esito = validaOutputRicerca(contenuto, ORA);
     assert.equal(esito.ok, false, JSON.stringify(contenuto));
-    if (!esito.ok) assert.match(esito.errore, /^Il risultato di Parallel non rispetta lo schema \(v2\):/);
+    if (!esito.ok) assert.match(esito.errore, /^Il risultato di Parallel non rispetta lo schema \(v3\):/);
   }
 });
 
@@ -201,5 +203,54 @@ test("schemaOutputParallel: chiede i candidati Atto con i campi validati da vali
   assert.deepEqual(Object.keys(schema.properties.atti_candidati.items.properties).sort(), [
     "criteri_testo", "da_notizia", "discrepanze", "giurisdizione", "identificativo_ufficiale",
     "settori", "soglie", "stato", "summary", "temi", "tipo", "titolo", "tutti_i_settori", "url_testo",
+  ]);
+});
+
+test("validaOutputRicerca: un cambio di Stato valido arriva ripulito accanto a Notizie e candidati", () => {
+  const esito = validaOutputRicerca(
+    {
+      notizie: [notiziaValida],
+      cambi_di_stato: [{ identificativo_ufficiale: " 32022L2464 ", stato: "modificato", data: "2026-03-10" }],
+    },
+    ORA,
+  );
+  assert.ok(esito.ok);
+  assert.deepEqual(esito.cambiDiStato, [
+    { identificativoUfficiale: "32022L2464", stato: "modificato", data: "2026-03-10" },
+  ]);
+  assert.deepEqual(esito.cambiScartati, []);
+});
+
+test("validaOutputRicerca: un cambio di Stato malformato si scarta da solo, gli altri restano", () => {
+  const buono = { identificativo_ufficiale: "32022L2464", stato: "in_vigore", data: "2026-03-10" };
+  const esito = validaOutputRicerca(
+    {
+      notizie: [notiziaValida],
+      cambi_di_stato: [
+        { ...buono, stato: "sospeso" },
+        { ...buono, data: "2027-01-01" },
+        { ...buono, identificativo_ufficiale: "  " },
+        buono,
+      ],
+    },
+    ORA,
+  );
+  assert.ok(esito.ok);
+  assert.deepEqual(esito.cambiDiStato.map((c) => c.stato), ["in_vigore"]);
+  assert.deepEqual(esito.cambiScartati.map((c) => c.posizione), [1, 2, 3]);
+  assert.match(esito.cambiScartati[0].motivo, /^cambi_di_stato\.1\.stato: /);
+  assert.match(esito.cambiScartati[1].motivo, /^cambi_di_stato\.2\.data: /);
+});
+
+test("validaOutputRicerca: senza cambi_di_stato l'output vale come senza cambi", () => {
+  const esito = validaOutputRicerca({ notizie: [notiziaValida] }, ORA);
+  assert.ok(esito.ok);
+  assert.deepEqual(esito.cambiDiStato, []);
+});
+
+test("schemaOutputParallel: chiede i cambi di Stato con i campi validati da validaOutputRicerca", () => {
+  const schema = schemaOutputParallel() as { properties: { cambi_di_stato: { items: { properties: Nodo } } } };
+  assert.deepEqual(Object.keys(schema.properties.cambi_di_stato.items.properties).sort(), [
+    "data", "identificativo_ufficiale", "stato",
   ]);
 });

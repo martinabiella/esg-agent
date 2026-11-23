@@ -42,9 +42,10 @@ test("avvio: parte su Parallel dalla finestra della Fonte e la Ricerca in corso 
   assert.deepEqual(richiesta.source_policy, { include_domains: ["eur-lex.europa.eu"], after_date: "2026-11-12" });
   assert.deepEqual(richiesta.task_spec.output_schema, { type: "json", json_schema: schemaOutputParallel() });
   assert.deepEqual(richiesta.webhook, { url: deps.urlWebhook, event_types: ["task_run.status"] });
-  assert.deepEqual(richiesta.metadata, { fonte_id: 1, fonte_nome: "EUR-Lex", versione_schema: 2 });
+  assert.deepEqual(richiesta.metadata, { fonte_id: 1, fonte_nome: "EUR-Lex", fonte_tipo: "ufficiale", versione_schema: 3 });
   assert.ok(richiesta.input.includes("EUR-Lex") && richiesta.input.includes("https://eur-lex.europa.eu/"));
   assert.ok(richiesta.input.includes("2026-11-12"));
+  assert.ok(richiesta.input.includes("cambi_di_stato"));
   assert.deepEqual(archivio.ricerche, [
     { id: 1, fonteId: 1, avviataIl: ORA, parallelRunId: "trun_1", esito: "in_corso", errore: null, notizieCreate: 0, attiCreati: 0 },
   ]);
@@ -91,7 +92,7 @@ test("avvio: un errore del servizio Parallel non mostra codici agli utenti", asy
 
 // ---- Webhook ----
 
-const METADATI_EUR_LEX = { fonte_id: 1, fonte_nome: "EUR-Lex", versione_schema: 2 };
+const METADATI_EUR_LEX = { fonte_id: 1, fonte_nome: "EUR-Lex", fonte_tipo: "ufficiale", versione_schema: 3 };
 
 function notiziaOutput(modifiche: Record<string, unknown> = {}) {
   return {
@@ -123,7 +124,7 @@ test("elaboraWebhook: run completato con output valido, salva le Notizie e chiud
 
   const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
-  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0 });
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0, cambiDiStato: 0 });
   assert.deepEqual(
     archivio.notizie,
     [
@@ -151,7 +152,7 @@ test("elaboraWebhook: output non valido, nessuna scrittura e Ricerca fallita nel
   assert.equal(esito.esito, "fallita");
   assert.deepEqual(archivio.notizie, []);
   assert.equal(archivio.ricerche[0].esito, "fallita");
-  assert.match(archivio.ricerche[0].errore ?? "", /non rispetta lo schema \(v2\): notizie/);
+  assert.match(archivio.ricerche[0].errore ?? "", /non rispetta lo schema \(v3\): notizie/);
 });
 
 test("elaboraWebhook: una Notizia non valida si scarta, le altre si salvano e la Ricerca è completata", async () => {
@@ -161,7 +162,7 @@ test("elaboraWebhook: una Notizia non valida si scarta, le altre si salvano e la
 
   const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
-  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 1, attiCreati: 0 });
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 1, attiCreati: 0, cambiDiStato: 0 });
   assert.deepEqual(archivio.notizie.map((n) => n.titolo), ["Omnibus: rinvio degli obblighi CSRD"]);
   assert.equal(archivio.ricerche[0].esito, "completata");
 });
@@ -171,7 +172,7 @@ test("elaboraWebhook: un risultato prodotto con un'altra versione dello schema n
 
   const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
-  const errore = "La Ricerca è stata avviata con un'altra versione dello schema dei risultati (ora v2): il risultato non è stato letto.";
+  const errore = "La Ricerca è stata avviata con un'altra versione dello schema dei risultati (ora v3): il risultato non è stato letto.";
   assert.deepEqual(esito, { esito: "fallita", errore });
   assert.deepEqual(archivio.notizie, []);
   assert.equal(archivio.ricerche[0].errore, errore);
@@ -199,7 +200,7 @@ test("elaboraWebhook: la stessa Notizia in una Ricerca successiva o ripetuta nel
   client.risultati.set("trun_2", { metadata: METADATI_EUR_LEX, contenuto: { notizie: [stessaNotizia, nuovo, nuovo] } });
   const esito = await elaboraWebhook(eventoCompletato("trun_2"), deps);
 
-  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0 });
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0, cambiDiStato: 0 });
   assert.deepEqual(
     archivio.notizie.map((n) => n.titolo),
     ["Omnibus: rinvio degli obblighi CSRD", "Nuovo"],
@@ -420,7 +421,7 @@ test("atti nuovi: Atto creato con la Fonte di origine, Notizia collegata e col f
 
   const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
-  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 1 });
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 1, cambiDiStato: 0 });
   assert.equal(archivio.attiCreati.length, 1);
   const [atto] = archivio.attiCreati;
   assert.equal(atto.identificativoUfficiale, "32024L1760");
@@ -446,7 +447,7 @@ test("atti nuovi: lo stesso candidato in un secondo run non crea un duplicato e 
   });
   const esito = await elaboraWebhook(eventoCompletato("trun_2"), deps);
 
-  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0 });
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0, cambiDiStato: 0 });
   assert.equal(archivio.attiCreati.length, 1);
   assert.deepEqual(archivio.notizie[1].atti, [archivio.attiCreati[0].id]);
   assert.equal(archivio.notizie[1].segnalaNovita, false);
@@ -477,7 +478,7 @@ test("atti nuovi: candidato non valido, senza identificativo o ambiguo: nessun A
 
   const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
-  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0 });
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0, cambiDiStato: 0 });
   assert.deepEqual(archivio.attiCreati, []);
   assert.equal(archivio.notizie[0].segnalaNovita, true);
   assert.deepEqual(archivio.notizie[0].atti, []);
@@ -536,7 +537,7 @@ test("elaboraWebhook: un run avviato con lo schema v1 è ancora leggibile, senza
 
   const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
-  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0 });
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0, cambiDiStato: 0 });
   assert.equal(archivio.notizie.length, 1);
 });
 
@@ -548,4 +549,70 @@ test("avvio: le istruzioni escludono gli atti di routine su singole sostanze e g
   const { input } = client.richieste[0];
   assert.ok(input.includes("singola sostanza"), "regola sugli atti di routine");
   assert.ok(input.includes("abrogati"), "regola sugli atti abrogati");
+});
+
+// ---- Cambi di Stato ----
+
+const csrdInVigore = () => ({ attoId: 7, stato: "in_vigore" as const, ultimaDataStato: "2025-06-01" });
+const cambioOutput = (c: Record<string, unknown> = {}) => ({
+  identificativo_ufficiale: "32022L2464",
+  stato: "modificato",
+  data: "2026-03-10",
+  ...c,
+});
+
+test("elaboraWebhook: Fonte ufficiale con nuovo Stato, l'Atto cambia Stato ed entra nello storico; il resto non si tocca", async () => {
+  const { archivio, deps } = await ricercaAvviata({ notizie: [notiziaOutput()], cambi_di_stato: [cambioOutput()] });
+  archivio.atti = CATALOGO;
+  archivio.stati = [csrdInVigore()];
+  const prima = structuredClone(archivio.atti);
+
+  const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
+
+  assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 0, attiCreati: 0, cambiDiStato: 1 });
+  assert.deepEqual(archivio.stati, [{ attoId: 7, stato: "modificato", ultimaDataStato: "2026-03-10" }]);
+  assert.deepEqual(archivio.storico, [{ attoId: 7, stato: "modificato", data: "2026-03-10" }]);
+  assert.deepEqual(archivio.statoConfermatoIl.get(7), ORA);
+  assert.deepEqual(archivio.atti, prima);
+});
+
+test("elaboraWebhook: Fonte editoriale con nuovo Stato, nessuna modifica all'Atto", async () => {
+  const { archivio, deps } = await ricercaAvviata(
+    { notizie: [notiziaOutput()], cambi_di_stato: [cambioOutput()] },
+    { ...METADATI_EUR_LEX, fonte_tipo: "editoriale" },
+  );
+  archivio.atti = CATALOGO;
+  archivio.stati = [csrdInVigore()];
+
+  const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
+
+  assert.equal(esito.esito === "completata" && esito.cambiDiStato, 0);
+  assert.deepEqual(archivio.stati, [csrdInVigore()]);
+  assert.deepEqual(archivio.storico, []);
+});
+
+test("elaboraWebhook: la stessa informazione ricevuta due volte non duplica lo storico", async () => {
+  const { archivio, deps } = await ricercaAvviata({ notizie: [], cambi_di_stato: [cambioOutput()] });
+  archivio.atti = CATALOGO;
+  archivio.stati = [csrdInVigore()];
+
+  await elaboraWebhook(eventoCompletato("trun_1"), deps);
+  const secondo = await elaboraWebhook(eventoCompletato("trun_1"), deps);
+
+  assert.deepEqual(secondo, { esito: "ignorato", motivo: "Ricerca già elaborata" });
+  assert.equal(archivio.storico.length, 1);
+});
+
+test("elaboraWebhook: un cambio malformato o per un Atto Non rilevante si ignora, il resto della Ricerca prosegue", async () => {
+  const { archivio, deps } = await ricercaAvviata({
+    notizie: [notiziaOutput()],
+    cambi_di_stato: [cambioOutput({ stato: "sospeso" }), cambioOutput({ identificativo_ufficiale: "32020R0852" })],
+  });
+  archivio.atti = CATALOGO;
+  archivio.stati = [csrdInVigore(), { attoId: 8, stato: "in_vigore", ultimaDataStato: null }];
+
+  const esito = await elaboraWebhook(eventoCompletato("trun_1"), deps);
+
+  assert.equal(esito.esito === "completata" && esito.notizieCreate, 1);
+  assert.deepEqual(archivio.storico, []);
 });

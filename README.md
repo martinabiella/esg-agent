@@ -84,7 +84,16 @@ Oltre alle Notizie, l'output (schema v2) ha `atti_candidati`: un candidato per o
 - **Settori e Temi.** I Settori sono solo quelli esistenti (Parallel riceve nelle istruzioni l'elenco con le descrizioni; i nomi che non esistono si scartano). I Temi nuovi si creano, con nome unico senza distinguere le maiuscole. Al massimo 5 Temi per Atto.
 - **Origine e disaccordi** stanno in testa al summary (`src/lib/avviso-agente.ts`) e la scheda dell'Atto li mostra in riquadri a parte.
 - **Una Notizia che cita un Atto appena creato** si collega a lui e mantiene il flag di novità.
-- **Schema v2.** I run avviati con la v1 e conclusi dopo il deploy si leggono ancora (senza candidati).
+- **Versioni dello schema.** I run avviati con la v1 o la v2 e conclusi dopo il deploy si leggono ancora (senza gli elenchi nuovi).
+
+### Cambi di Stato dall'agente
+
+L'output (schema v3) ha anche `cambi_di_stato`: atti già noti con nuovo Stato e data. `decidiCambiDiStato` (`src/lib/cambi-di-stato.ts`, pura) decide quali si applicano; `completaRicerca` li scrive nella stessa istruzione.
+- **Solo Fonti ufficiali.** Una Fonte editoriale non cambia mai lo Stato (il tipo viaggia nei metadati del run: senza, vale come editoriale).
+- **Si applica** se l'Atto è riconosciuto dall'identificativo ufficiale, non è Non rilevante né abrogato, lo Stato è diverso e la data è posteriore all'ultima voce dello storico (un ritorno a uno Stato precedente vale, se più recente). Cambi dello stesso run sullo stesso Atto: in ordine di data.
+- **Cosa cambia.** `stato`, una riga in `stato_storico` (provenienza `agente`, `visto_il` vuoto), `stato_confermato_il`. Nient'altro dell'Atto. La stessa informazione due volte non duplica (indice unico atto, Stato, data).
+- **Non visti.** `cambiDiStatoNonVisti()` (`src/db/cambi-di-stato.ts`) elenca i cambi dell'agente con `visto_il` vuoto, per l'Avviso di conferma (#11).
+- **Migrazione 0007.** Aggiunge `provenienza` e `visto_il` a `stato_storico` e l'indice unico: va applicata con `npm run db:migrate` prima del deploy.
 
 ### Esecuzione settimanale e pulsante
 

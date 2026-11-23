@@ -13,9 +13,11 @@ import { TIPI_ATTO, type GiurisdizioneAtto, type TipoAtto } from "./tipi-atto";
 import { normalizzaUrlNotizia, urlHttpValido } from "./url";
 
 // v2: aggiunge i candidati Atto (atti_candidati).
-export const VERSIONE_OUTPUT = 2;
-// La v1 è una v2 senza candidati: i run avviati con lei si leggono ancora.
-export const VERSIONI_LEGGIBILI: readonly number[] = [1, 2];
+// v3: aggiunge i cambi di Stato di Atti già noti (cambi_di_stato).
+export const VERSIONE_OUTPUT = 3;
+// Le versioni precedenti sono la v3 senza gli elenchi nuovi: i run avviati con
+// loro si leggono ancora.
+export const VERSIONI_LEGGIBILI: readonly number[] = [1, 2, 3];
 
 const attoCitato = z
   .object({
@@ -116,6 +118,16 @@ const attoCandidato = z
     "Un atto normativo da aggiungere al catalogo: direttiva, regolamento, decisione, legge, decreto o disegno di legge, non rapporti né documenti di lavoro",
   );
 
+const cambioDiStato = z
+  .object({
+    identificativo_ufficiale: z
+      .string()
+      .describe("Identificativo ufficiale dell'atto che ha cambiato stato (CELEX, numero COM, numero e anno)"),
+    stato: z.enum(STATI_ATTO).describe("Nuovo stato dell'atto"),
+    data: z.string().describe("Data del cambio di stato nel formato AAAA-MM-GG, come risulta dalla fonte"),
+  })
+  .describe("Un atto normativo di cui la fonte riporta un nuovo stato con la sua data");
+
 const outputRicerca = z.object({
   notizie: z
     .array(notiziaTrovata)
@@ -124,6 +136,11 @@ const outputRicerca = z.object({
     .array(attoCandidato)
     .describe(
       "Atti normativi con identificativo ufficiale citati negli articoli, uno per atto anche se citato più volte; vuoto se nessuno",
+    ),
+  cambi_di_stato: z
+    .array(cambioDiStato)
+    .describe(
+      "Atti di cui la fonte riporta un nuovo stato dell'iter con la data (es. entrato in vigore, modificato, abrogato), uno per cambio; vuoto se nessuno",
     ),
 });
 
@@ -165,6 +182,14 @@ export type AttoCandidato = {
   discrepanze: string[];
 };
 
+// Un nuovo Stato di un Atto, come lo riporta la Fonte, ripulito. Se l'Atto è
+// nel catalogo e se applicarlo lo decide decidiCambiDiStato (src/lib/cambi-di-stato.ts).
+export type CambioDiStato = {
+  identificativoUfficiale: string;
+  stato: (typeof STATI_ATTO)[number];
+  data: string;
+};
+
 // Una Notizia o un candidato dell'output che non supera i controlli: si scarta da solo.
 export type NotiziaScartata = { posizione: number; motivo: string };
 
@@ -175,6 +200,8 @@ export type EsitoOutputRicerca =
       scartate: NotiziaScartata[];
       candidati: AttoCandidato[];
       candidatiScartati: NotiziaScartata[];
+      cambiDiStato: CambioDiStato[];
+      cambiScartati: NotiziaScartata[];
     }
   // Il testo compare agli utenti come motivo per cui la Fonte non è leggibile.
   | { ok: false; errore: string };
@@ -271,7 +298,11 @@ function candidatoPulito(c: z.infer<typeof attoCandidato>): AttoCandidato {
 
 // Per la validazione bastano gli elenchi: ogni Notizia e ogni candidato si
 // controllano da soli. Un output senza atti_candidati vale come senza candidati.
-const elencoNotizie = z.object({ notizie: z.array(z.unknown()), atti_candidati: z.array(z.unknown()).optional() });
+const elencoNotizie = z.object({
+  notizie: z.array(z.unknown()),
+  atti_candidati: z.array(z.unknown()).optional(),
+  cambi_di_stato: z.array(z.unknown()).optional(),
+});
 
 // Senza l'elenco delle Notizie l'output non è valido e la Ricerca fallisce. Una
 // Notizia che non supera i controlli (struttura, URL, titolo, data) si scarta
@@ -315,5 +346,29 @@ export function validaOutputRicerca(contenuto: unknown, ora: Date): EsitoOutputR
       });
     }
   });
-  return { ok: true, notizie, scartate, candidati, candidatiScartati };
+
+  const cambiDiStato: CambioDiStato[] = [];
+  const cambiScartati: NotiziaScartata[] = [];
+  (elenco.data.cambi_di_stato ?? []).forEach((grezzo, i) => {
+    const posizione = i + 1;
+    const prefisso = `cambi_di_stato.${posizione}`;
+    const letto = cambioDiStato.safeParse(grezzo, errori);
+    const problemi: ProblemaOutput[] = letto.success ? [] : problemiDiStruttura(letto.error, prefisso);
+    if (letto.success) {
+      if (!letto.data.identificativo_ufficiale.trim()) {
+        problemi.push({ campo: `${prefisso}.identificativo_ufficiale`, messaggio: "L'identificativo è vuoto" });
+      }
+      if (!dataPlausibile(letto.data.data, domani)) {
+        problemi.push({ campo: `${prefisso}.data`, messaggio: "Data non valida (AAAA-MM-GG) o nel futuro" });
+      }
+    }
+    if (letto.success && problemi.length === 0) {
+      cambiDiStato.push({
+        identificativoUfficiale: letto.data.identificativo_ufficiale.trim(),
+        stato: letto.data.stato,
+        data: letto.data.data,
+      });
+    } else cambiScartati.push({ posizione, motivo: elencoProblemi(problemi) });
+  });
+  return { ok: true, notizie, scartate, candidati, candidatiScartati, cambiDiStato, cambiScartati };
 }
