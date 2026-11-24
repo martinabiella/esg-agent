@@ -20,9 +20,9 @@ const UN_ORA_MS = 60 * 60 * 1000;
 const ORE_BLOCCO = 2;
 const inizioBlocco = (ora: Date) => new Date(ora.getTime() - ORE_BLOCCO * UN_ORA_MS);
 
-// Parallel ritenta il webhook per 48 ore: dopo, il risultato non arriva più e
-// la Ricerca si chiude come fallita (la Fonte risulta non leggibile). La
-// pagina Fonti la mostra così già prima che la prossima Esecuzione la chiuda.
+// Dopo 48 ore dall'avvio la pagina Fonti mostra il ritardo. Solo le Ricerche
+// rimaste senza run Parallel vengono chiuse; i tentativi di consegna del
+// webhook decorrono dall'evento, non dall'avvio della Ricerca.
 export const ORE_SCADENZA = 48;
 // Neutro: la Ricerca può essere rimasta in corso anche senza che Parallel
 // l'abbia mai ricevuta (per esempio se la funzione si è interrotta).
@@ -86,8 +86,8 @@ export interface ArchivioEsecuzioni extends ArchivioRicerche {
   // corso senza run quelle da avviare, saltate per tetto le altre. Due avvii
   // contemporanei non aprono due esecuzioni.
   apriEsecuzione(esecuzione: NuovaEsecuzione): Promise<AperturaEsecuzione>;
-  // Le Ricerche ancora in corso avviate prima di avviatePrima diventano
-  // fallite con questo errore. Restituisce quante sono.
+  // Le Ricerche ancora in corso senza run Parallel avviate prima di
+  // avviatePrima diventano fallite. Restituisce quante sono.
   chiudiRicercheScadute(avviatePrima: Date, errore: string): Promise<number>;
 }
 

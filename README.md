@@ -84,8 +84,8 @@ Un'Esecuzione parte in due modi:
 
 Regole dell'Esecuzione:
 - **Tetto.** Partono al massimo `TETTO_RICERCHE` Ricerche: prima le Fonti ufficiali, poi le editoriali. A parità di tipo partono prima le Fonti mai partite e poi quelle partite meno di recente. Le altre sono registrate come «saltate per tetto».
-- **Un'Esecuzione alla volta.** Se una Ricerca avviata da meno di 2 ore è ancora in corso, un nuovo avvio non fa nulla.
-- **Ritardi.** Dopo 2 ore una Ricerca senza risultato non blocca più, ma resta aperta: un webhook in ritardo salva le Notizie lo stesso. Dopo 48 ore, quando Parallel smette di ritentare, la Ricerca diventa fallita.
+- **Blocco dei nuovi avvii.** Se una Ricerca avviata da meno di 2 ore è ancora in corso, né il cron né il pulsante avviano un'altra Esecuzione. Dopo 2 ore la Ricerca non blocca più e risulta «Senza risposta» nel riepilogo, ma può ancora ricevere il risultato.
+- **Ritardi.** Dopo 48 ore, la prossima Esecuzione chiude solo le Ricerche senza un ID di run Parallel. Per le altre, un webhook in ritardo può ancora salvare le Notizie.
 - **Nessun retry.** Una Ricerca fallita si recupera all'Esecuzione successiva grazie alla finestra temporale.
 
 Cose da sapere sul cron:

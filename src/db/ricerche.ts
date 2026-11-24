@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, lt, max, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, isNull, lt, max, sql } from "drizzle-orm";
 import { db } from "./index";
 import { fontiDaControllare } from "./fonti";
 import { attoNormativo, chiaveNomeFonte, esecuzioneRicerca, fonte } from "./schema";
@@ -165,7 +165,11 @@ export const archivioRicerche: ArchivioEsecuzioni = {
     const righe = await db
       .update(esecuzioneRicerca)
       .set({ esito: "fallita", errore, terminataIl: sql`now()` })
-      .where(and(eq(esecuzioneRicerca.esito, "in_corso"), lt(esecuzioneRicerca.avviataIl, avviatePrima)))
+      .where(and(
+        eq(esecuzioneRicerca.esito, "in_corso"),
+        isNull(esecuzioneRicerca.parallelRunId),
+        lt(esecuzioneRicerca.avviataIl, avviatePrima),
+      ))
       .returning({ id: esecuzioneRicerca.id });
     return righe.length;
   },

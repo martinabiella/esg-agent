@@ -48,7 +48,9 @@ export class ArchivioFinto implements ArchivioEsecuzioni {
     return { esito: "aperta" as const, ricerche };
   }
   async chiudiRicercheScadute(avviatePrima: Date, errore: string) {
-    const scadute = this.ricerche.filter((r) => r.esito === "in_corso" && r.avviataIl < avviatePrima);
+    const scadute = this.ricerche.filter(
+      (r) => r.esito === "in_corso" && r.parallelRunId === null && r.avviataIl < avviatePrima,
+    );
     for (const r of scadute) Object.assign(r, { esito: "fallita", errore });
     return scadute.length;
   }
