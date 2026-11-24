@@ -234,6 +234,8 @@ test("avviaEsecuzione: un webhook oltre le 48 ore salva ancora il risultato di u
     esito: "completata",
     notizieCreate: 1,
     notizieScartate: 0,
+    attiCreati: 0,
+    cambiDiStato: 0,
   });
   assert.deepEqual(archivio.ricerche.map((r) => r.esito), ["completata", "in_corso"]);
   assert.deepEqual(archivio.notizie.map((n) => n.url), ["https://fonte1.example/notizia"]);
