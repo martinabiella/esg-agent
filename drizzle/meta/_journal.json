@@ -50,6 +50,27 @@
       "when": 1795088116595,
       "tag": "0006_chemical_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795560951712,
+      "tag": "0007_identificativo_atto_normalizzato",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795561177171,
+      "tag": "0008_storico_agente",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795561220420,
+      "tag": "0009_avviso_di_conferma",
+      "breakpoints": true
     }
   ]
 }
