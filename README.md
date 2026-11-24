@@ -81,19 +81,20 @@ Il webhook non raggiunge `localhost`: in locale si prova con il client finto dei
 Oltre alle Notizie, l'output (schema v2) ha `atti_candidati`: un candidato per ogni atto con identificativo ufficiale citato negli articoli. `decidiAttiNuovi` (`src/lib/atti-nuovi.ts`, pura) decide quali diventano Atti, e `completaRicerca` (`src/db/ricerche.ts`) li scrive in un'unica istruzione insieme alle Notizie.
 - **Si crea l'Atto** solo con un identificativo ufficiale, se il catalogo non lo ha già (`trovaAttoCitato`: identificativo, poi titolo e Giurisdizione), se non è ambiguo, se non è un Atto Non rilevante e se supera `validaAtto` (Tipo coerente con la Giurisdizione, date, Soglie). Altrimenti non si crea nulla, il motivo va nel log del server e la Notizia resta col flag.
 - **Come nasce.** Provenienza `agente`, Criteri non confermati, `fonte_id` della Fonte, `stato_confermato_il` vuoto.
-- **Settori e Temi.** I Settori sono solo quelli esistenti (Parallel riceve nelle istruzioni l'elenco con le descrizioni; i nomi che non esistono si scartano). I Temi nuovi si creano, con nome unico senza distinguere le maiuscole. Al massimo 5 Temi per Atto.
+- **Settori e Temi.** I Settori sono solo quelli esistenti. Se nessuno corrisponde, l'Atto resta senza Settore. I Temi nuovi si creano, con nome unico senza distinguere le maiuscole. Al massimo 5 Temi per Atto.
+- **Unicità.** L'indice sull'identificativo ignora maiuscole e spazi anche se due Ricerche scrivono insieme. Se il catalogo contiene già duplicati, la migrazione si ferma: risolverli prima di riprovare.
 - **Origine e disaccordi** stanno in testa al summary (`src/lib/avviso-agente.ts`) e la scheda dell'Atto li mostra in riquadri a parte.
 - **Una Notizia che cita un Atto appena creato** si collega a lui e mantiene il flag di novità.
 - **Versioni dello schema.** I run avviati con la v1 o la v2 e conclusi dopo il deploy si leggono ancora (senza gli elenchi nuovi).
 
 ### Cambi di Stato dall'agente
 
-L'output (schema v3) ha anche `cambi_di_stato`: atti già noti con nuovo Stato e data. `decidiCambiDiStato` (`src/lib/cambi-di-stato.ts`, pura) decide quali si applicano; `completaRicerca` li scrive nella stessa istruzione.
+L'output (schema v3) ha anche `cambi_di_stato`: atti già noti con nuovo Stato e data. `decidiCambiDiStato` (`src/lib/cambi-di-stato.ts`, pura) seleziona i cambi. `completaRicerca` blocca gli Atti interessati, poi legge di nuovo lo storico e salva i cambi ancora validi nella stessa transazione.
 - **Solo Fonti ufficiali.** Una Fonte editoriale non cambia mai lo Stato (il tipo viaggia nei metadati del run: senza, vale come editoriale).
 - **Si applica** se l'Atto è riconosciuto dall'identificativo ufficiale, non è Non rilevante né abrogato, lo Stato è diverso e la data è posteriore all'ultima voce dello storico (un ritorno a uno Stato precedente vale, se più recente). Cambi dello stesso run sullo stesso Atto: in ordine di data.
-- **Cosa cambia.** `stato`, una riga in `stato_storico` (provenienza `agente`, `visto_il` vuoto), `stato_confermato_il`. Nient'altro dell'Atto. La stessa informazione due volte non duplica (indice unico atto, Stato, data).
+- **Cosa cambia.** `stato`, `stato_confermato_il` e una riga in `stato_storico` (provenienza `agente`, `visto_il` vuoto). `aggiornato_il` resta invariato: i Criteri di applicabilità non sono cambiati. L'indice unico su Atto, Stato e data vale solo per le righe dell'agente. Un ritorno manuale allo stesso Stato nella stessa data resta nello storico.
 - **Non visti.** `cambiDiStatoNonVisti()` (`src/db/cambi-di-stato.ts`) elenca i cambi dell'agente con `visto_il` vuoto, per l'Avviso di conferma (#11).
-- **Migrazione 0007.** Aggiunge `provenienza` e `visto_il` a `stato_storico` e l'indice unico: va applicata con `npm run db:migrate` prima del deploy.
+- **Migrazione.** `0008_storico_agente` aggiunge `provenienza`, `visto_il` e l'indice per le righe dell'agente. Rimuove il vecchio indice globale, se presente. Applicare le migrazioni prima del deploy con `npm run db:migrate`.
 
 ### Esecuzione settimanale e pulsante
 
@@ -103,8 +104,8 @@ Un'Esecuzione parte in due modi:
 
 Regole dell'Esecuzione:
 - **Tetto.** Partono al massimo `TETTO_RICERCHE` Ricerche: prima le Fonti ufficiali, poi le editoriali. A parità di tipo partono prima le Fonti mai partite e poi quelle partite meno di recente. Le altre sono registrate come «saltate per tetto».
-- **Un'Esecuzione alla volta.** Se una Ricerca avviata da meno di 2 ore è ancora in corso, un nuovo avvio non fa nulla.
-- **Ritardi.** Dopo 2 ore una Ricerca senza risultato non blocca più, ma resta aperta: un webhook in ritardo salva le Notizie lo stesso. Dopo 48 ore, quando Parallel smette di ritentare, la Ricerca diventa fallita.
+- **Blocco dei nuovi avvii.** Se una Ricerca avviata da meno di 2 ore è ancora in corso, né il cron né il pulsante avviano un'altra Esecuzione. Dopo 2 ore la Ricerca non blocca più e risulta «Senza risposta» nel riepilogo, ma può ancora ricevere il risultato.
+- **Ritardi.** Dopo 48 ore, la prossima Esecuzione chiude solo le Ricerche senza un ID di run Parallel. Per le altre, un webhook in ritardo può ancora salvare le Notizie.
 - **Nessun retry.** Una Ricerca fallita si recupera all'Esecuzione successiva grazie alla finestra temporale.
 
 Cose da sapere sul cron:
