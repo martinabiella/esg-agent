@@ -167,6 +167,17 @@ test("elaboraWebhook: una Notizia non valida si scarta, le altre si salvano e la
   assert.equal(archivio.ricerche[0].esito, "completata");
 });
 
+test("elaboraWebhook: se tutte le Notizie sono invalide la Ricerca fallisce", async () => {
+  const { archivio, deps } = await ricercaAvviata({
+    notizie: [notiziaOutput({ url: "non-un-url" }), { titolo: "Senza gli altri campi" }],
+  });
+
+  assert.equal((await elaboraWebhook(eventoCompletato("trun_1"), deps)).esito, "fallita");
+  assert.equal(archivio.ricerche[0].esito, "fallita");
+  assert.match(archivio.ricerche[0].errore ?? "", /Notizie non valide/);
+  assert.deepEqual(archivio.notizie, []);
+});
+
 test("elaboraWebhook: un risultato prodotto con un'altra versione dello schema non viene letto", async () => {
   const { archivio, deps } = await ricercaAvviata({ notizie: [notiziaOutput()] }, { ...METADATI_EUR_LEX, versione_schema: 0 });
 
