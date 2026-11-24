@@ -90,3 +90,12 @@ export function titoloAvviso(nAtti: number, nNotizie: number): string | null {
   ].filter((p) => p !== null);
   return parti.length > 0 ? `${parti.join(" e ")} da controllare` : null;
 }
+
+const GIORNI_NOTIZIE_NELL_AVVISO = 30;
+
+// Una Notizia più vecchia di 30 giorni non entra nell'Avviso: se in tutto quel
+// tempo nessuno ha aperto la piattaforma, non è più una novità. Il limite si
+// applica alla data in cui l'agente l'ha trovata (creato_il), non a quella di pubblicazione.
+export function limiteNotizieAvviso(adesso: Date): Date {
+  return new Date(adesso.getTime() - GIORNI_NOTIZIE_NELL_AVVISO * 24 * 60 * 60 * 1000);
+}

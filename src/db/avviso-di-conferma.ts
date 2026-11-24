@@ -1,16 +1,18 @@
-import { and, asc, eq, isNull, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, notExists, sql } from "drizzle-orm";
 import { db } from "./index";
 import { impattoPerAtto } from "./applicabilita";
 import { cambiDiStatoNonVisti } from "./cambi-di-stato";
 import { attoNormativo, notizia, notiziaAtto, statoStorico } from "./schema";
 import {
   costruisciAvviso,
+  limiteNotizieAvviso,
   ordinaPerImpatto,
   type Avviso,
   type RigheAvviso,
 } from "@/lib/avviso-di-conferma";
 
 async function righeAvviso(): Promise<RigheAvviso> {
+  const recenti = limiteNotizieAvviso(new Date());
   const [attiDaConfermare, cambi, notizieSuAtti, notizieSenzaAtto] = await Promise.all([
     db
       .select({
@@ -42,6 +44,7 @@ async function righeAvviso(): Promise<RigheAvviso> {
       .where(
         and(
           eq(notizia.segnalaNovita, true),
+          gte(notizia.creatoIl, recenti),
           isNull(notiziaAtto.controllataIl),
           eq(attoNormativo.nonRilevante, false),
         ),
@@ -53,6 +56,7 @@ async function righeAvviso(): Promise<RigheAvviso> {
       .where(
         and(
           eq(notizia.segnalaNovita, true),
+          gte(notizia.creatoIl, recenti),
           isNull(notizia.controllataIl),
           notExists(
             db.select({ x: sql`1` }).from(notiziaAtto).where(eq(notiziaAtto.notiziaId, notizia.id)),

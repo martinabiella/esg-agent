@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { costruisciAvviso, ordinaPerImpatto, titoloAvviso, type RigheAvviso } from "./avviso-di-conferma";
+import { costruisciAvviso, limiteNotizieAvviso, ordinaPerImpatto, titoloAvviso, type RigheAvviso } from "./avviso-di-conferma";
 
 const vuote: RigheAvviso = {
   attiDaConfermare: [],
@@ -103,4 +103,10 @@ test("un Atto in lista solo per una Notizia ha come ultimo movimento la data del
     ],
   });
   assert.equal(atti[0].ultimoMovimento, "2026-10-05");
+});
+
+test("una Notizia entra nell'Avviso solo se trovata negli ultimi 30 giorni", () => {
+  const adesso = new Date("2026-11-24T12:00:00.000Z");
+  const limite = limiteNotizieAvviso(adesso);
+  assert.equal(limite.toISOString(), "2026-10-25T12:00:00.000Z");
 });
