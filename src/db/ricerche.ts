@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, isNull, lt, max, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, max, sql } from "drizzle-orm";
 import { db } from "./index";
 import { fontiDaControllare } from "./fonti";
 import { attoNormativo, chiaveNomeFonte, esecuzioneRicerca, fonte, settore, tema } from "./schema";
@@ -9,6 +9,7 @@ import type {
   UltimaEsecuzione,
 } from "@/lib/esecuzione";
 import type { AttoDaCreare } from "@/lib/atti-nuovi";
+import type { CambioApplicato } from "@/lib/cambi-di-stato";
 import type { NotiziaDaSalvare } from "@/lib/ricerca-fonte";
 
 export type Ricerca = typeof esecuzioneRicerca.$inferSelect;
@@ -64,8 +65,8 @@ export async function ultimaEsecuzione(): Promise<UltimaEsecuzione | null> {
 }
 
 // ---- Archivio per l'agente (src/lib/ricerca-fonte.ts e src/lib/esecuzione.ts) ----
-// Il driver neon-http non ha transazioni interattive: le scritture che vanno
-// insieme stanno in una sola istruzione, quindi atomica.
+// Il driver neon-http non ha transazioni interattive: per più istruzioni
+// atomiche si usa db.batch.
 
 // Atti nuovi e Notizie dell'agente (provenienza_contenuti = 'agente') con
 // collegamenti, poi la chiusura della Ricerca.
@@ -76,9 +77,15 @@ export async function ultimaEsecuzione(): Promise<UltimaEsecuzione | null> {
 // due Ricerche che propongono lo stesso Atto ne creano uno. Un Atto nuovo nasce
 // con Criteri non confermati e Stato non confermato, da una Fonte; solo gli
 // Atti nati qui ricevono Settori (esistenti), Temi (creati se mancano, senza
-// distinguere le maiuscole); lo Stato dell'agente non entra nello storico. Si collegano alle Notizie
-// solo Atti che esistono ancora e non sono Non rilevanti.
-async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: AttoDaCreare[]) {
+// distinguere le maiuscole); lo Stato iniziale dell'Atto nuovo non entra nello
+// storico. Si collegano alle Notizie solo Atti che esistono ancora e non sono Non rilevanti.
+async function completaRicerca(
+  id: number,
+  notizie: NotiziaDaSalvare[],
+  atti: AttoDaCreare[],
+  cambi: CambioApplicato[],
+) {
+  const righeCambi = cambi.map((c) => ({ atto_id: c.attoId, stato: c.stato, data: c.data }));
   const righe = notizie.map((n) => ({
     titolo: n.titolo,
     fonte: n.pubblicataDa,
@@ -103,11 +110,32 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: At
     settori: a.settori,
     temi: a.temi,
   }));
-  const risultato = await db.execute<{ notizie_create: number; atti_creati: number }>(sql`
+  const completa = db.execute<{ notizie_create: number; atti_creati: number; cambi_di_stato: number }>(sql`
     WITH ricerca_bloccata AS (
       SELECT id, fonte_id FROM esecuzione_ricerca
       WHERE id = ${id} AND esito = 'in_corso'
       FOR UPDATE
+    ), dati_cambi AS (
+      SELECT * FROM jsonb_to_recordset(${JSON.stringify(righeCambi)}::jsonb) AS c(atto_id int, stato stato, data date)
+    ), cambi_validi AS (
+      SELECT c.* FROM dati_cambi c
+      JOIN atto_normativo a ON a.id = c.atto_id
+      WHERE NOT a.non_rilevante AND a.stato <> 'abrogato'
+        AND EXISTS (SELECT 1 FROM ricerca_bloccata)
+        AND c.data > COALESCE((SELECT max(s.data) FROM stato_storico s WHERE s.atto_id = c.atto_id), '-infinity'::date)
+    ), storico_nuovo AS (
+      INSERT INTO stato_storico (atto_id, stato, data, provenienza)
+      SELECT atto_id, stato, data, 'agente'::provenienza FROM cambi_validi
+      ON CONFLICT (atto_id, stato, data) WHERE provenienza = 'agente' DO NOTHING
+      RETURNING atto_id, stato, data
+    ), stato_aggiornato AS (
+      UPDATE atto_normativo a
+      SET stato = u.stato, stato_confermato_il = now()
+      FROM (
+        SELECT DISTINCT ON (atto_id) atto_id, stato FROM storico_nuovo ORDER BY atto_id, data DESC
+      ) u
+      WHERE a.id = u.atto_id
+      RETURNING a.id
     ), dati_atti AS (
       SELECT * FROM jsonb_to_recordset(${JSON.stringify(righeAtti)}::jsonb) AS a(
         identificativo text, titolo text, giurisdizione giurisdizione, tipo tipo_atto, stato stato,
@@ -188,10 +216,28 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: At
         notizie_create = (SELECT count(*) FROM nuove),
         atti_creati = (SELECT count(*) FROM atti_nuovi)
     WHERE id IN (SELECT id FROM ricerca_bloccata)
-    RETURNING notizie_create, atti_creati
+    RETURNING notizie_create, atti_creati, (SELECT count(*) FROM stato_aggiornato) AS cambi_di_stato
   `);
+  const attiDaBloccare = [...new Set(cambi.map((c) => c.attoId))];
+  // In READ COMMITTED il lock deve essere un'istruzione separata: dopo un'attesa
+  // l'istruzione successiva legge anche lo storico appena salvato dall'altro writer.
+  const risultato = attiDaBloccare.length === 0
+    ? await completa
+    : (await db.batch([
+        db.execute(sql`
+          SELECT id FROM atto_normativo WHERE ${inArray(attoNormativo.id, attiDaBloccare)}
+          ORDER BY id FOR NO KEY UPDATE
+        `),
+        completa,
+      ]))[1];
   const [riga] = risultato.rows;
-  return riga ? { notizieCreate: Number(riga.notizie_create), attiCreati: Number(riga.atti_creati) } : null;
+  return riga
+    ? {
+        notizieCreate: Number(riga.notizie_create),
+        attiCreati: Number(riga.atti_creati),
+        cambiDiStato: Number(riga.cambi_di_stato),
+      }
+    : null;
 }
 
 // Un'Esecuzione alla volta: il lock consultivo, preso nella stessa
@@ -276,6 +322,16 @@ export const archivioRicerche: ArchivioEsecuzioni = {
         identificativoUfficiale: attoNormativo.identificativoUfficiale,
         giurisdizione: attoNormativo.giurisdizione,
         nonRilevante: attoNormativo.nonRilevante,
+      })
+      .from(attoNormativo);
+  },
+
+  async statiAtti() {
+    return db
+      .select({
+        attoId: attoNormativo.id,
+        stato: attoNormativo.stato,
+        ultimaDataStato: sql<string | null>`(SELECT max(s.data) FROM stato_storico s WHERE s.atto_id = ${attoNormativo.id})`,
       })
       .from(attoNormativo);
   },

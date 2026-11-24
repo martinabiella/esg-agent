@@ -3,6 +3,7 @@
 
 import type { AttoDaCreare } from "./atti-nuovi";
 import { type AttoCatalogo, chiaveIdentificativo } from "./atto-citato";
+import type { CambioApplicato, StatoAtto } from "./cambi-di-stato";
 import type { ArchivioEsecuzioni, DipendenzeEsecuzione, FonteDaControllare, NuovaEsecuzione } from "./esecuzione";
 import type { ClientParallel, RichiestaTaskRun, RisultatoTaskRun } from "./parallel";
 import type { EsitoRicerca, NotiziaDaSalvare, SettoreConDescrizione } from "./ricerca-fonte";
@@ -29,6 +30,10 @@ export class ArchivioFinto implements ArchivioEsecuzioni {
   notizie: NotiziaFinta[] = [];
   ultimaRiuscita = new Map<number, Date>();
   atti: AttoCatalogo[] = [];
+  stati: StatoAtto[] = [];
+  // Le voci aggiunte allo storico dall'agente e la data di conferma dello Stato.
+  storico: { attoId: number; stato: CambioApplicato["stato"]; data: string }[] = [];
+  statoConfermatoIl = new Map<number, Date>();
   settori: SettoreConDescrizione[] = [];
   temi: string[] = [];
   // Gli Atti nati da una Ricerca, con la Fonte di origine.
@@ -76,6 +81,9 @@ export class ArchivioFinto implements ArchivioEsecuzioni {
   async attiCatalogo() {
     return this.atti;
   }
+  async statiAtti() {
+    return this.stati;
+  }
   async settoriCatalogo() {
     return this.settori;
   }
@@ -86,7 +94,9 @@ export class ArchivioFinto implements ArchivioEsecuzioni {
   // crea una seconda Notizia (vincolo unique su notizia.url); un identificativo
   // già presente non crea un secondo Atto (unique su identificativo_ufficiale);
   // i Temi nuovi si creano senza distinguere le maiuscole; i Settori mai.
-  async completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: AttoDaCreare[]) {
+  // I cambi di Stato valgono solo per Atti non Non rilevanti né abrogati, con data
+  // successiva all'ultima dello storico; le voci identiche non si duplicano.
+  async completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: AttoDaCreare[], cambi: CambioApplicato[] = []) {
     const r = this.ricerche.find((x) => x.id === id);
     if (!r || r.esito !== "in_corso") return null;
 
@@ -119,8 +129,20 @@ export class ArchivioFinto implements ArchivioEsecuzioni {
       const collegati = [...new Set([...n.atti, ...daNuovi.map((a) => a.id)])];
       this.notizie.push({ ...n, atti: collegati, id: this.notizie.length + 1 });
     }
+    let cambiDiStato = 0;
+    for (const c of [...cambi].sort((a, b) => a.data.localeCompare(b.data))) {
+      const stato = this.stati.find((s) => s.attoId === c.attoId);
+      const atto = this.atti.find((a) => a.id === c.attoId);
+      if (!stato || !atto || atto.nonRilevante || stato.stato === "abrogato") continue;
+      if (stato.ultimaDataStato !== null && c.data <= stato.ultimaDataStato) continue;
+      if (this.storico.some((v) => v.attoId === c.attoId && v.stato === c.stato && v.data === c.data)) continue;
+      this.storico.push({ attoId: c.attoId, stato: c.stato, data: c.data });
+      Object.assign(stato, { stato: c.stato, ultimaDataStato: c.data });
+      this.statoConfermatoIl.set(c.attoId, ORA);
+      cambiDiStato++;
+    }
     Object.assign(r, { esito: "completata", notizieCreate: nuove.length, attiCreati: nuoviAtti.length });
-    return { notizieCreate: nuove.length, attiCreati: nuoviAtti.length };
+    return { notizieCreate: nuove.length, attiCreati: nuoviAtti.length, cambiDiStato };
   }
   async segnaFallita(id: number, errore: string) {
     const r = this.ricerche.find((x) => x.id === id);

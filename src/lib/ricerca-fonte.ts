@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { esitoRicerca } from "../db/schema";
 import { type AttoDaCreare, type SettoreCatalogo, decidiAttiNuovi } from "./atti-nuovi";
 import { type AttoCatalogo, chiaveIdentificativo, trovaAttoCitato } from "./atto-citato";
+import { type CambioApplicato, type StatoAtto, decidiCambiDiStato } from "./cambi-di-stato";
 import type { TipoFonte } from "./fonte";
 import {
   type NotiziaTrovata,
@@ -59,18 +60,21 @@ export interface ArchivioRicerche {
   assegnaRun(ricercaId: number, runId: string): Promise<void>;
   ricercaPerRunId(runId: string): Promise<{ id: number; esito: EsitoRicerca } | null>;
   attiCatalogo(): Promise<AttoCatalogo[]>;
+  // Stato attuale e data dell'ultima voce dello storico di ogni Atto.
+  statiAtti(): Promise<StatoAtto[]>;
   settoriCatalogo(): Promise<SettoreConDescrizione[]>;
   nomiTemi(): Promise<string[]>;
   // Atomica: crea gli Atti nuovi (quelli con identificativo già presente si
   // saltano) con Settori, Temi e storico dello Stato, salva le Notizie nuove
-  // (gli URL già presenti si saltano) con i collegamenti e chiude la Ricerca
-  // come completata. null se la Ricerca non era più in corso: nulla è stato
-  // scritto.
+  // (gli URL già presenti si saltano) con i collegamenti, applica i cambi di
+  // Stato (con riga nello storico e data di conferma) e chiude la Ricerca come
+  // completata. null se la Ricerca non era più in corso: nulla è stato scritto.
   completaRicerca(
     id: number,
     notizie: NotiziaDaSalvare[],
     atti: AttoDaCreare[],
-  ): Promise<{ notizieCreate: number; attiCreati: number } | null>;
+    cambiDiStato: CambioApplicato[],
+  ): Promise<{ notizieCreate: number; attiCreati: number; cambiDiStato: number } | null>;
   // false se la Ricerca non era più in corso. `errore` compare agli utenti come
   // motivo: italiano leggibile, niente dettagli tecnici.
   segnaFallita(id: number, errore: string): Promise<boolean>;
@@ -113,6 +117,7 @@ function istruzioni(
     `Ignora anche gli atti di esecuzione di routine che riguardano una singola sostanza, un singolo prodotto o una singola autorizzazione (per esempio l'approvazione o il rinnovo di una sostanza attiva biocida): non ne fare né una Notizia né un atto candidato. Restano invece di interesse gli atti generali (regolamenti e direttive quadro) quando la fonte li modifica o ne parla.`,
     `Per ogni articolo riporta gli atti normativi citati con il loro identificativo ufficiale (CELEX, COM, numero e anno), anche se l'articolo non lo scrive, purché tu ne sia certo. Non riportare come atti rapporti, consultazioni o documenti di lavoro.`,
     `Elenca in atti_candidati ogni atto normativo con identificativo ufficiale citato negli articoli, una sola volta anche se citato in più articoli, con i dati ricavati dal testo ufficiale quando lo trovi. Se due articoli sono in disaccordo su un dato (per esempio lo Stato), scegli la versione della fonte più autorevole e descrivi il disaccordo in discrepanze, indicando chi dice cosa. In da_notizia metti l'URL dell'articolo da cui hai preso i dati. Non elencare gli atti abrogati.`,
+    `In cambi_di_stato elenca gli atti di cui la fonte riporta un nuovo stato dell'iter (per esempio «entrato in vigore», «modificato», «abrogato») con la data del cambio e l'identificativo ufficiale; anche gli atti abrogati vanno qui. Non indovinare: solo cambi che la fonte afferma e data alla mano.`,
     `Per i settori usa solo i nomi di questo elenco, mai nomi nuovi; se nessuno calza lascia l'elenco vuoto, e usa tutti_i_settori solo se l'atto vale per tutta l'economia:`,
     ...settori.map((s) => `- ${s.nome}${s.descrizione ? `: ${s.descrizione}` : ""}`),
     ...(temi.length > 0
@@ -167,7 +172,7 @@ export async function avviaRicercaPerFonte(
     processor: PROCESSORE,
     task_spec: { output_schema: { type: "json", json_schema: schemaOutputParallel() } },
     source_policy: { include_domains: [dominio(fonte.url)], after_date: dal },
-    metadata: { fonte_id: fonte.id, fonte_nome: fonte.nome, versione_schema: VERSIONE_OUTPUT },
+    metadata: { fonte_id: fonte.id, fonte_nome: fonte.nome, fonte_tipo: fonte.tipo, versione_schema: VERSIONE_OUTPUT },
     webhook: { url: deps.urlWebhook, event_types: ["task_run.status"] },
   };
 
@@ -195,7 +200,7 @@ export async function avviaRicercaPerFonte(
 
 export type EsitoWebhook =
   // notizieScartate: Notizie dell'output che non superavano i controlli.
-  | { esito: "completata"; notizieCreate: number; notizieScartate: number; attiCreati: number }
+  | { esito: "completata"; notizieCreate: number; notizieScartate: number; attiCreati: number; cambiDiStato: number }
   | { esito: "fallita"; errore: string }
   // Evento che non riguarda una Ricerca da chiudere: si conferma e basta.
   | { esito: "ignorato"; motivo: string }
@@ -328,16 +333,31 @@ export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): 
   for (const s of output.candidatiScartati) {
     console.warn(`Run Parallel ${runId}: candidato Atto ${s.posizione} scartato (${s.motivo})`);
   }
-  const [atti, settori] = await Promise.all([deps.archivio.attiCatalogo(), deps.archivio.settoriCatalogo()]);
+  for (const s of output.cambiScartati) {
+    console.warn(`Run Parallel ${runId}: cambio di Stato ${s.posizione} scartato (${s.motivo})`);
+  }
+  const [atti, settori, stati] = await Promise.all([
+    deps.archivio.attiCatalogo(),
+    deps.archivio.settoriCatalogo(),
+    deps.archivio.statiAtti(),
+  ]);
   const { daCreare, scartati } = decidiAttiNuovi(output.candidati, atti, settori, deps.ora());
   for (const s of scartati) {
     console.warn(`Run Parallel ${runId}: «${s.titolo}» non diventa un Atto (${s.motivo})`);
+  }
+  // Una Ricerca avviata prima della v3 non porta il tipo della Fonte: nel dubbio
+  // non cambia nessuno Stato.
+  const tipoFonte = risultato.metadata?.fonte_tipo === "ufficiale" ? "ufficiale" : "editoriale";
+  const cambi = decidiCambiDiStato(output.cambiDiStato, atti, stati, tipoFonte);
+  for (const c of cambi.ignorati) {
+    console.warn(`Run Parallel ${runId}: cambio di Stato di ${c.identificativo} ignorato (${c.motivo})`);
   }
   // Un altro recapito dello stesso evento può averla chiusa nel frattempo.
   const scritto = await deps.archivio.completaRicerca(
     ricerca.id,
     notizieDaSalvare(output.notizie, atti, nomeFonte, daCreare),
     daCreare,
+    cambi.daApplicare,
   );
   return scritto
     ? {
@@ -345,6 +365,7 @@ export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): 
         notizieCreate: scritto.notizieCreate,
         notizieScartate: output.scartate.length,
         attiCreati: scritto.attiCreati,
+        cambiDiStato: scritto.cambiDiStato,
       }
     : GIA_ELABORATA;
 }

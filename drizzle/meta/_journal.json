@@ -57,6 +57,13 @@
       "when": 1795560951712,
       "tag": "0007_identificativo_atto_normalizzato",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795561177171,
+      "tag": "0008_storico_agente",
+      "breakpoints": true
     }
   ]
 }
