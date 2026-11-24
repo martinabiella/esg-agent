@@ -172,15 +172,14 @@ test("se il primo candidato con un identificativo non è valido, il secondo con 
   assert.deepEqual(daCreare.map((a) => a.titolo), ["CSRD corretta"]);
 });
 
-test("un candidato senza nessun Settore del catalogo non diventa Atto, salvo che valga per tutti i Settori", () => {
-  const senzaSettori = { ...candidato, settori: ["Settore inventato"] };
-  const esito = decidiAttiNuovi([senzaSettori], [], settori, ORA);
-  assert.deepEqual(esito.daCreare, []);
-  assert.equal(esito.scartati.length, 1);
-  assert.match(esito.scartati[0].motivo, /nessun Settore/);
-
-  const perTutti = decidiAttiNuovi([{ ...senzaSettori, tuttiISettori: true }], [], settori, ORA);
-  assert.equal(perTutti.daCreare.length, 1);
+test("un candidato valido senza Settori del catalogo diventa un Atto senza Settori", () => {
+  for (const nomi of [[], ["Settore inventato"]]) {
+    const { daCreare, scartati } = decidiAttiNuovi([{ ...candidato, settori: nomi }], [], settori, ORA);
+    assert.deepEqual(scartati, []);
+    assert.deepEqual(daCreare.map((a) => ({ settori: a.settori, tuttiISettori: a.tuttiISettori })), [
+      { settori: [], tuttiISettori: false },
+    ]);
+  }
 });
 
 test("oltre 20 candidati validi per Ricerca si creano i primi 20, gli altri si scartano con il motivo", () => {

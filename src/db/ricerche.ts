@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, lt, max, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, isNull, lt, max, sql } from "drizzle-orm";
 import { db } from "./index";
 import { fontiDaControllare } from "./fonti";
 import { attoNormativo, chiaveNomeFonte, esecuzioneRicerca, fonte, settore, tema } from "./schema";
@@ -72,7 +72,7 @@ export async function ultimaEsecuzione(): Promise<UltimaEsecuzione | null> {
 // La riga della Ricerca è bloccata (FOR UPDATE) e deve essere ancora in corso:
 // un secondo recapito dello stesso evento, anche in contemporanea, non scrive
 // nulla. Gli URL già presenti si saltano (vincolo unique su notizia.url) e così
-// gli identificativi già presenti (unique su atto_normativo.identificativo_ufficiale):
+// gli identificativi già presenti (anche con maiuscole o spazi diversi):
 // due Ricerche che propongono lo stesso Atto ne creano uno. Un Atto nuovo nasce
 // con Criteri non confermati e Stato non confermato, da una Fonte; solo gli
 // Atti nati qui ricevono Settori (esistenti), Temi (creati se mancano, senza
@@ -123,7 +123,7 @@ async function completaRicerca(id: number, notizie: NotiziaDaSalvare[], atti: At
         a.criteri_soglie, a.criteri_testo, false, a.tutti_i_settori, false,
         'agente'::provenienza, r.fonte_id, now()
       FROM dati_atti a CROSS JOIN ricerca_bloccata r
-      ON CONFLICT (identificativo_ufficiale) DO NOTHING
+      ON CONFLICT DO NOTHING
       RETURNING id, identificativo_ufficiale
     ), temi_nuovi AS (
       INSERT INTO tema (nome)
@@ -243,7 +243,11 @@ export const archivioRicerche: ArchivioEsecuzioni = {
     const righe = await db
       .update(esecuzioneRicerca)
       .set({ esito: "fallita", errore, terminataIl: sql`now()` })
-      .where(and(eq(esecuzioneRicerca.esito, "in_corso"), lt(esecuzioneRicerca.avviataIl, avviatePrima)))
+      .where(and(
+        eq(esecuzioneRicerca.esito, "in_corso"),
+        isNull(esecuzioneRicerca.parallelRunId),
+        lt(esecuzioneRicerca.avviataIl, avviatePrima),
+      ))
       .returning({ id: esecuzioneRicerca.id });
     return righe.length;
   },

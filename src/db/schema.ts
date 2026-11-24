@@ -96,6 +96,9 @@ export const fonte = pgTable(
   ],
 );
 
+// Gli stessi spazi di /\s/ in chiaveIdentificativo (src/lib/atto-citato.ts).
+const spaziIdentificativo = sql.raw(String.raw`U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]+'`);
+
 export const attoNormativo = pgTable("atto_normativo", {
   id: serial("id").primaryKey(),
   titolo: text("titolo").notNull(),
@@ -124,7 +127,10 @@ export const attoNormativo = pgTable("atto_normativo", {
   statoConfermatoIl: timestamp("stato_confermato_il"),
   creatoIl: timestamp("creato_il").notNull().defaultNow(),
   aggiornatoIl: timestamp("aggiornato_il").notNull().defaultNow(),
-});
+}, (t) => [
+  uniqueIndex("atto_normativo_identificativo_normalizzato_idx")
+    .on(sql`upper(regexp_replace(${t.identificativoUfficiale}, ${spaziIdentificativo}, '', 'g'))`),
+]);
 
 export const statoStorico = pgTable("stato_storico", {
   id: serial("id").primaryKey(),

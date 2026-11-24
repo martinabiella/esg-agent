@@ -318,6 +318,9 @@ export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): 
   for (const s of output.scartate) {
     console.warn(`Run Parallel ${runId}: Notizia ${s.posizione} scartata (${s.motivo})`);
   }
+  if (output.notizie.length === 0 && output.scartate.length > 0) {
+    return fallita("Parallel ha restituito solo Notizie non valide.");
+  }
 
   // Il nome viaggia nei metadati del run: la Fonte potrebbe essere stata
   // eliminata o rinominata nel frattempo.

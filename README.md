@@ -81,7 +81,8 @@ Il webhook non raggiunge `localhost`: in locale si prova con il client finto dei
 Oltre alle Notizie, l'output (schema v2) ha `atti_candidati`: un candidato per ogni atto con identificativo ufficiale citato negli articoli. `decidiAttiNuovi` (`src/lib/atti-nuovi.ts`, pura) decide quali diventano Atti, e `completaRicerca` (`src/db/ricerche.ts`) li scrive in un'unica istruzione insieme alle Notizie.
 - **Si crea l'Atto** solo con un identificativo ufficiale, se il catalogo non lo ha già (`trovaAttoCitato`: identificativo, poi titolo e Giurisdizione), se non è ambiguo, se non è un Atto Non rilevante e se supera `validaAtto` (Tipo coerente con la Giurisdizione, date, Soglie). Altrimenti non si crea nulla, il motivo va nel log del server e la Notizia resta col flag.
 - **Come nasce.** Provenienza `agente`, Criteri non confermati, `fonte_id` della Fonte, `stato_confermato_il` vuoto.
-- **Settori e Temi.** I Settori sono solo quelli esistenti (Parallel riceve nelle istruzioni l'elenco con le descrizioni; i nomi che non esistono si scartano). I Temi nuovi si creano, con nome unico senza distinguere le maiuscole. Al massimo 5 Temi per Atto.
+- **Settori e Temi.** I Settori sono solo quelli esistenti. Se nessuno corrisponde, l'Atto resta senza Settore. I Temi nuovi si creano, con nome unico senza distinguere le maiuscole. Al massimo 5 Temi per Atto.
+- **Unicità.** L'indice sull'identificativo ignora maiuscole e spazi anche se due Ricerche scrivono insieme. Se il catalogo contiene già duplicati, la migrazione si ferma: risolverli prima di riprovare.
 - **Origine e disaccordi** stanno in testa al summary (`src/lib/avviso-agente.ts`) e la scheda dell'Atto li mostra in riquadri a parte.
 - **Una Notizia che cita un Atto appena creato** si collega a lui e mantiene il flag di novità.
 - **Schema v2.** I run avviati con la v1 e conclusi dopo il deploy si leggono ancora (senza candidati).
@@ -94,8 +95,8 @@ Un'Esecuzione parte in due modi:
 
 Regole dell'Esecuzione:
 - **Tetto.** Partono al massimo `TETTO_RICERCHE` Ricerche: prima le Fonti ufficiali, poi le editoriali. A parità di tipo partono prima le Fonti mai partite e poi quelle partite meno di recente. Le altre sono registrate come «saltate per tetto».
-- **Un'Esecuzione alla volta.** Se una Ricerca avviata da meno di 2 ore è ancora in corso, un nuovo avvio non fa nulla.
-- **Ritardi.** Dopo 2 ore una Ricerca senza risultato non blocca più, ma resta aperta: un webhook in ritardo salva le Notizie lo stesso. Dopo 48 ore, quando Parallel smette di ritentare, la Ricerca diventa fallita.
+- **Blocco dei nuovi avvii.** Se una Ricerca avviata da meno di 2 ore è ancora in corso, né il cron né il pulsante avviano un'altra Esecuzione. Dopo 2 ore la Ricerca non blocca più e risulta «Senza risposta» nel riepilogo, ma può ancora ricevere il risultato.
+- **Ritardi.** Dopo 48 ore, la prossima Esecuzione chiude solo le Ricerche senza un ID di run Parallel. Per le altre, un webhook in ritardo può ancora salvare le Notizie.
 - **Nessun retry.** Una Ricerca fallita si recupera all'Esecuzione successiva grazie alla finestra temporale.
 
 Cose da sapere sul cron:
