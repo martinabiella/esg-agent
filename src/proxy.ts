@@ -46,8 +46,13 @@ export default async function proxy(request: NextRequest) {
   return risposta;
 }
 
-// Il webhook di Parallel (src/app/api/parallel/webhook) non ha una sessione:
-// si autentica con la firma, quindi resta fuori dal proxy.
+// Il webhook di Parallel (src/app/api/parallel/webhook) e il cron delle
+// Ricerche (src/app/api/cron/esecuzione) non hanno una sessione: si
+// autenticano con la firma e con CRON_SECRET, quindi restano fuori dal proxy.
+// Il cron di Vercel non segue i redirect: un 307 verso l'accesso lo
+// fermerebbe senza errori.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/parallel/webhook).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/parallel/webhook|api/cron/esecuzione).*)",
+  ],
 };

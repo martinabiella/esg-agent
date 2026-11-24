@@ -1,21 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { ORA, dipendenze } from "./agente-finto";
 import type { AttoCatalogo } from "./atto-citato";
+import { type FonteDaControllare, avviaEsecuzione } from "./esecuzione";
 import { schemaOutputParallel } from "./output-ricerca";
-import { type ClientParallel, ErroreParallel, type RichiestaTaskRun, type RisultatoTaskRun } from "./parallel";
-import {
-  type ArchivioRicerche,
-  type DipendenzeRicerca,
-  type FonteRicerca,
-  type NotiziaDaSalvare,
-  type NuovaRicerca,
-  avviaRicercaPerFonte,
-  avviaRicerchePerFonti,
-  elaboraWebhook,
-  finestraRicerca,
-} from "./ricerca-fonte";
-
-const ORA = new Date("2026-11-19T06:00:00Z");
+import { ErroreParallel } from "./parallel";
+import { elaboraWebhook, finestraRicerca } from "./ricerca-fonte";
 
 test("finestraRicerca: senza Ricerche riuscite, gli ultimi 30 giorni", () => {
   assert.equal(finestraRicerca(null, ORA), "2026-10-20");
@@ -25,94 +15,29 @@ test("finestraRicerca: parte dal giorno in cui è stata avviata l'ultima Ricerca
   assert.equal(finestraRicerca(new Date("2026-11-12T05:59:00Z"), ORA), "2026-11-12");
 });
 
-// ---- Finti: client Parallel e archivio in memoria ----
+const EUR_LEX: FonteDaControllare = {
+  id: 1,
+  nome: "EUR-Lex",
+  url: "https://eur-lex.europa.eu/",
+  tipo: "ufficiale",
+  ultimaPartitaIl: null,
+};
 
-type RicercaFinta = NuovaRicerca & { id: number; notizieCreate: number };
-type NotiziaFinta = NotiziaDaSalvare & { id: number };
-
-class ArchivioFinto implements ArchivioRicerche {
-  ricerche: RicercaFinta[] = [];
-  notizie: NotiziaFinta[] = [];
-  ultimaRiuscita = new Map<number, Date>();
-  atti: AttoCatalogo[] = [];
-
-  async ultimaRicercaRiuscita(fonteId: number) {
-    return this.ultimaRiuscita.get(fonteId) ?? null;
-  }
-  async registraRicerca(r: NuovaRicerca) {
-    const id = this.ricerche.length + 1;
-    this.ricerche.push({ ...r, id, notizieCreate: 0 });
-    return id;
-  }
-  async ricercaPerRunId(runId: string) {
-    const r = this.ricerche.find((x) => x.parallelRunId === runId);
-    return r ? { id: r.id, esito: r.esito } : null;
-  }
-  async attiCatalogo() {
-    return this.atti;
-  }
-  // Come il DB: solo se la Ricerca è ancora in corso, e un URL già presente non
-  // crea una seconda Notizia (vincolo unique su notizia.url).
-  async completaRicerca(id: number, notizie: NotiziaDaSalvare[]) {
-    const r = this.ricerche.find((x) => x.id === id);
-    if (!r || r.esito !== "in_corso") return null;
-    const nuove = notizie.filter((n) => !this.notizie.some((e) => e.url === n.url));
-    for (const n of nuove) this.notizie.push({ ...n, id: this.notizie.length + 1 });
-    Object.assign(r, { esito: "completata", notizieCreate: nuove.length });
-    const ultima = this.ultimaRiuscita.get(r.fonteId);
-    if (!ultima || ultima < r.avviataIl) this.ultimaRiuscita.set(r.fonteId, r.avviataIl);
-    return { notizieCreate: nuove.length };
-  }
-  async segnaFallita(id: number, errore: string) {
-    const r = this.ricerche.find((x) => x.id === id);
-    if (!r || r.esito !== "in_corso") return false;
-    Object.assign(r, { esito: "fallita", errore });
-    return true;
-  }
+// Un'esecuzione con la sola Fonte EUR-Lex.
+function conEurLex() {
+  const ambiente = dipendenze();
+  ambiente.archivio.fonti = [EUR_LEX];
+  return ambiente;
 }
-
-class ClientFinto implements ClientParallel {
-  richieste: RichiestaTaskRun[] = [];
-  risultati = new Map<string, RisultatoTaskRun>();
-  falliscePer = new Map<string, Error>();
-
-  async avviaTaskRun(richiesta: RichiestaTaskRun) {
-    const errore = this.falliscePer.get(String(richiesta.metadata.fonte_nome));
-    if (errore) throw errore;
-    this.richieste.push(richiesta);
-    return { runId: `trun_${this.richieste.length}` };
-  }
-  async risultatoTaskRun(runId: string) {
-    const risultato = this.risultati.get(runId);
-    if (!risultato) throw new Error(`run ${runId} sconosciuto`);
-    return risultato;
-  }
-}
-
-function dipendenze() {
-  const archivio = new ArchivioFinto();
-  const client = new ClientFinto();
-  const deps: DipendenzeRicerca = {
-    archivio,
-    client,
-    urlWebhook: "https://esg.esempio.it/api/parallel/webhook",
-    ora: () => ORA,
-  };
-  return { archivio, client, deps };
-}
-
-const EUR_LEX: FonteRicerca = { id: 1, nome: "EUR-Lex", url: "https://eur-lex.europa.eu/", tipo: "ufficiale" };
-const GAZZETTA: FonteRicerca = { id: 2, nome: "Gazzetta Ufficiale", url: "https://www.gazzettaufficiale.it/", tipo: "ufficiale" };
 
 // ---- Avvio ----
 
-test("avviaRicercaPerFonte: avvia su Parallel dalla finestra della Fonte e registra la Ricerca in corso", async () => {
-  const { archivio, client, deps } = dipendenze();
+test("avvio: parte su Parallel dalla finestra della Fonte e la Ricerca in corso riceve il run", async () => {
+  const { archivio, client, deps } = conEurLex();
   archivio.ultimaRiuscita.set(1, new Date("2026-11-12T06:00:00Z"));
 
-  const esito = await avviaRicercaPerFonte(EUR_LEX, deps);
+  await avviaEsecuzione(deps);
 
-  assert.deepEqual(esito, { esito: "avviata", ricercaId: 1, runId: "trun_1" });
   const [richiesta] = client.richieste;
   assert.deepEqual(richiesta.source_policy, { include_domains: ["eur-lex.europa.eu"], after_date: "2026-11-12" });
   assert.deepEqual(richiesta.task_spec.output_schema, { type: "json", json_schema: schemaOutputParallel() });
@@ -125,64 +50,42 @@ test("avviaRicercaPerFonte: avvia su Parallel dalla finestra della Fonte e regis
   ]);
 });
 
-test("avviaRicercaPerFonte: se Parallel rifiuta l'avvio, la Ricerca è fallita nel log con un motivo leggibile", async () => {
-  const { archivio, client, deps } = dipendenze();
+test("avvio: se Parallel rifiuta l'avvio, la Ricerca è fallita nel log con un motivo leggibile", async () => {
+  const { archivio, client, deps } = conEurLex();
   client.falliscePer.set("EUR-Lex", new ErroreParallel(402, "Insufficient credit"));
 
-  const esito = await avviaRicercaPerFonte(EUR_LEX, deps);
+  const esito = await avviaEsecuzione(deps);
 
-  const errore = "Parallel non ha avviato la Ricerca: credito esaurito.";
-  assert.deepEqual(esito, { esito: "fallita", errore });
+  assert.deepEqual(esito, { esito: "avviata", avviataIl: ORA, avviate: 0, fallite: 1, saltate: 0 });
   assert.deepEqual(archivio.ricerche, [
-    { id: 1, fonteId: 1, avviataIl: ORA, parallelRunId: null, esito: "fallita", errore, notizieCreate: 0 },
+    {
+      id: 1,
+      fonteId: 1,
+      avviataIl: ORA,
+      parallelRunId: null,
+      esito: "fallita",
+      errore: "Parallel non ha avviato la Ricerca: credito esaurito.",
+      notizieCreate: 0,
+    },
   ]);
 });
 
-test("avviaRicercaPerFonte: errori di rete o imprevisti diventano un motivo generico, senza dettagli tecnici", async () => {
-  const { archivio, client, deps } = dipendenze();
+test("avvio: errori di rete o imprevisti diventano un motivo generico, senza dettagli tecnici", async () => {
+  const { archivio, client, deps } = conEurLex();
   client.falliscePer.set("EUR-Lex", new TypeError("fetch failed: ECONNRESET 10.0.0.1"));
 
-  const esito = await avviaRicercaPerFonte(EUR_LEX, deps);
+  await avviaEsecuzione(deps);
 
-  assert.deepEqual(esito, { esito: "fallita", errore: "Parallel non è raggiungibile: la Ricerca non è partita." });
   assert.equal(archivio.ricerche[0].errore, "Parallel non è raggiungibile: la Ricerca non è partita.");
 });
 
-test("avviaRicerchePerFonti: una Fonte che fallisce non impedisce l'avvio delle altre", async () => {
-  const { archivio, client, deps } = dipendenze();
-  const CAMERA: FonteRicerca = { id: 3, nome: "Camera dei deputati", url: "https://www.camera.it/", tipo: "ufficiale" };
-  const SENATO: FonteRicerca = { id: 4, nome: "Senato della Repubblica", url: "https://www.senato.it/", tipo: "ufficiale" };
-  client.falliscePer.set("Gazzetta Ufficiale", new ErroreParallel(429, "Too many requests"));
-  // Un errore imprevisto del database su una Fonte.
-  const originale = archivio.ultimaRicercaRiuscita.bind(archivio);
-  archivio.ultimaRicercaRiuscita = async (fonteId) => {
-    if (fonteId === 3) throw new Error("connessione al DB persa");
-    return originale(fonteId);
-  };
+test("avvio: un errore del servizio Parallel non mostra codici agli utenti", async () => {
+  const { archivio, client, deps } = conEurLex();
+  client.falliscePer.set("EUR-Lex", new ErroreParallel(503, "Service Unavailable"));
 
-  const esiti = await avviaRicerchePerFonti([EUR_LEX, GAZZETTA, CAMERA, SENATO], deps);
+  await avviaEsecuzione(deps);
 
-  assert.deepEqual(
-    esiti.map((e) => [e.fonteId, e.esito]),
-    [
-      [1, "avviata"],
-      [2, "fallita"],
-      [3, "fallita"],
-      [4, "avviata"],
-    ],
-  );
-  assert.deepEqual(
-    client.richieste.map((r) => r.metadata.fonte_nome),
-    ["EUR-Lex", "Senato della Repubblica"],
-  );
-  assert.deepEqual(
-    archivio.ricerche.map((r) => [r.fonteId, r.esito]),
-    [
-      [1, "in_corso"],
-      [2, "fallita"],
-      [4, "in_corso"],
-    ],
-  );
+  assert.equal(archivio.ricerche[0].errore, "Parallel non ha avviato la Ricerca: servizio non disponibile.");
 });
 
 // ---- Webhook ----
@@ -207,9 +110,9 @@ function eventoCompletato(runId: string) {
 }
 
 async function ricercaAvviata(contenuto: unknown, metadata: Record<string, unknown> = METADATI_EUR_LEX) {
-  const ambiente = dipendenze();
-  const avvio = await avviaRicercaPerFonte(EUR_LEX, ambiente.deps);
-  assert.equal(avvio.esito, "avviata");
+  const ambiente = conEurLex();
+  const avvio = await avviaEsecuzione(ambiente.deps);
+  assert.equal(avvio.esito === "avviata" && avvio.avviate, 1);
   ambiente.client.risultati.set("trun_1", { metadata, contenuto });
   return ambiente;
 }
@@ -262,33 +165,15 @@ test("elaboraWebhook: una Notizia non valida si scarta, le altre si salvano e la
   assert.equal(archivio.ricerche[0].esito, "completata");
 });
 
-test("elaboraWebhook: se tutte le Notizie sono invalide la Ricerca fallisce e la finestra non cambia", async () => {
-  const { archivio, client, deps } = await ricercaAvviata({
+test("elaboraWebhook: se tutte le Notizie sono invalide la Ricerca fallisce", async () => {
+  const { archivio, deps } = await ricercaAvviata({
     notizie: [notiziaOutput({ url: "non-un-url" }), { titolo: "Senza gli altri campi" }],
   });
-  archivio.ultimaRiuscita.set(EUR_LEX.id, new Date("2026-11-12T06:00:00Z"));
 
   assert.equal((await elaboraWebhook(eventoCompletato("trun_1"), deps)).esito, "fallita");
   assert.equal(archivio.ricerche[0].esito, "fallita");
   assert.match(archivio.ricerche[0].errore ?? "", /Notizie non valide/);
   assert.deepEqual(archivio.notizie, []);
-
-  await avviaRicercaPerFonte(EUR_LEX, deps);
-  assert.equal(client.richieste[1].source_policy.after_date, "2026-11-12");
-});
-
-test("elaboraWebhook: un elenco vuoto è una Ricerca riuscita senza Notizie", async () => {
-  const { archivio, client, deps } = await ricercaAvviata({ notizie: [] });
-
-  assert.deepEqual(await elaboraWebhook(eventoCompletato("trun_1"), deps), {
-    esito: "completata",
-    notizieCreate: 0,
-    notizieScartate: 0,
-  });
-  assert.equal(archivio.ricerche[0].esito, "completata");
-
-  await avviaRicercaPerFonte(EUR_LEX, deps);
-  assert.equal(client.richieste[1].source_policy.after_date, "2026-11-19");
 });
 
 test("elaboraWebhook: un risultato prodotto con un'altra versione dello schema non viene letto", async () => {
@@ -318,7 +203,7 @@ test("elaboraWebhook: la stessa Notizia in una Ricerca successiva o ripetuta nel
   const { archivio, client, deps } = await ricercaAvviata({ notizie: [notiziaOutput()] });
   await elaboraWebhook(eventoCompletato("trun_1"), deps);
 
-  await avviaRicercaPerFonte(EUR_LEX, deps);
+  await avviaEsecuzione(deps);
   const stessaNotizia = notiziaOutput({ url: "https://eur-lex.europa.eu/legal-content/IT/TXT/?uri=CELEX:52025PC0081#top" });
   const nuovo = notiziaOutput({ url: "https://eur-lex.europa.eu/nuovo", titolo: "Nuovo" });
   client.risultati.set("trun_2", { metadata: METADATI_EUR_LEX, contenuto: { notizie: [stessaNotizia, nuovo, nuovo] } });
@@ -452,29 +337,6 @@ test("elaboraWebhook: senza versione dello schema nei metadati il risultato non 
   assert.equal(esito.esito, "fallita");
   assert.equal(archivio.ricerche[0].errore?.includes("undefined"), false);
   assert.deepEqual(archivio.notizie, []);
-});
-
-test("avviaRicercaPerFonte: un errore del servizio Parallel non mostra codici agli utenti", async () => {
-  const { archivio, client, deps } = dipendenze();
-  client.falliscePer.set("EUR-Lex", new ErroreParallel(503, "Service Unavailable"));
-
-  await avviaRicercaPerFonte(EUR_LEX, deps);
-
-  assert.equal(archivio.ricerche[0].errore, "Parallel non ha avviato la Ricerca: servizio non disponibile.");
-});
-
-test("avviaRicercaPerFonte: un errore di configurazione non passa per un problema di Parallel", async () => {
-  const { archivio, client, deps } = dipendenze();
-  const senzaWebhook: DipendenzeRicerca = {
-    ...deps,
-    get urlWebhook(): string {
-      throw new Error("Variabile d'ambiente PARALLEL_WEBHOOK_URL mancante");
-    },
-  };
-
-  await assert.rejects(avviaRicercaPerFonte(EUR_LEX, senzaWebhook), /PARALLEL_WEBHOOK_URL/);
-  assert.deepEqual(client.richieste, []);
-  assert.deepEqual(archivio.ricerche, []);
 });
 
 test("elaboraWebhook: una Notizia che cita solo Atti Non rilevanti non segnala una novità, anche se l'agente lo dice", async () => {

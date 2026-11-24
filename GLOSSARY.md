@@ -77,5 +77,9 @@ Etichetta che una persona assegna a un Atto per escluderlo dalle viste normali e
 _Avoid_: Scartato, archiviato, ignorato
 
 **Ricerca**:
-Un'esecuzione dell'agente. *Per Fonte*: controlla una Fonte dell'elenco (monitora gli Atti esistenti e cerca Notizie e nuovi Atti) a ogni giro. *Per Tema*: cerca sul web, a partire da un Tema, normative e notizie non pubblicate dalle Fonti note.
+Un singolo controllo dell'agente, dentro un'Esecuzione. *Per Fonte*: controlla una Fonte dell'elenco (monitora gli Atti esistenti e cerca Notizie e nuovi Atti) a ogni Esecuzione. *Per Tema*: cerca sul web, a partire da un Tema, normative e notizie non pubblicate dalle Fonti note.
 _Avoid_: Scansione, crawl, job
+
+**Esecuzione**:
+L'insieme delle Ricerche avviate insieme, ogni lunedì mattina o con il pulsante "Avvia ricerca ora". Le Ricerche oltre il tetto non partono e risultano *saltate per tetto*. Ne parte una alla volta: un'Esecuzione è *in corso* finché una sua Ricerca attende il risultato, per al massimo 2 ore. Non ha retry: una Ricerca fallita si recupera all'Esecuzione successiva.
+_Avoid_: Giro, run, batch

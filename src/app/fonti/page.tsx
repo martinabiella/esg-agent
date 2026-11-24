@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import { Caricamento } from "@/app/caricamento";
 import { elencoFonti, trovaFonte } from "@/db/fonti";
+import { ultimaEsecuzione } from "@/db/ricerche";
+import { esitoEsecuzione } from "@/lib/esecuzione";
 import { fonteIdDaParams } from "@/lib/fonte";
+import { AvviaRicerca } from "./avvia-ricerca";
 import { TabellaFonti } from "./tabella-fonti";
 
 export const metadata = { title: "Fonti · Monitoraggio ESG" };
@@ -27,10 +30,16 @@ async function Contenuto({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const id = fonteIdDaParams(await searchParams);
-  const [fonti, fonteAperta] = await Promise.all([
+  const [fonti, fonteAperta, ultima] = await Promise.all([
     elencoFonti(),
     id === null ? Promise.resolve(null) : trovaFonte(id),
+    ultimaEsecuzione(),
   ]);
 
-  return <TabellaFonti fonti={fonti} fonteAperta={fonteAperta} />;
+  return (
+    <>
+      <AvviaRicerca ultima={ultima && esitoEsecuzione(ultima, new Date())} />
+      <TabellaFonti fonti={fonti} fonteAperta={fonteAperta} />
+    </>
+  );
 }
