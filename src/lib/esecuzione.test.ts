@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ORA, dipendenze } from "./agente-finto";
 import { ErroreParallel } from "./parallel";
-import type { EsitoRicerca } from "./ricerca-fonte";
+import { elaboraWebhook, type EsitoRicerca } from "./ricerca-fonte";
 import {
   type DipendenzeEsecuzione,
   type FonteDaControllare,
@@ -206,6 +206,37 @@ test("avviaEsecuzione: dopo 48 ore chiude le Ricerche rimaste senza run Parallel
       [ORA, "in_corso", null],
     ],
   );
+});
+
+test("avviaEsecuzione: un webhook oltre le 48 ore salva ancora il risultato di un run registrato", async () => {
+  const { archivio, client, deps } = dipendenze();
+  archivio.fonti = [fonte(1, "ufficiale", null)];
+  const primoAvvio = new Date(ORA.getTime() - ORE(49));
+  await avviaEsecuzione({ ...deps, ora: () => primoAvvio });
+  await avviaEsecuzione(deps);
+  client.risultati.set("trun_1", {
+    metadata: client.richieste[0].metadata,
+    contenuto: {
+      notizie: [{
+        titolo: "Notizia arrivata in ritardo",
+        url: "https://fonte1.example/notizia",
+        data: null,
+        pubblicata_da: null,
+        riassunto: "",
+        segnala_novita: false,
+        atti_citati: [],
+      }],
+    },
+  });
+
+  const webhook = { type: "task_run.status", data: { run_id: "trun_1", status: "completed" } };
+  assert.deepEqual(await elaboraWebhook(webhook, deps), {
+    esito: "completata",
+    notizieCreate: 1,
+    notizieScartate: 0,
+  });
+  assert.deepEqual(archivio.ricerche.map((r) => r.esito), ["completata", "in_corso"]);
+  assert.deepEqual(archivio.notizie.map((n) => n.url), ["https://fonte1.example/notizia"]);
 });
 
 // ---- Esito dell'ultima esecuzione (accanto al pulsante «Avvia ricerca ora») ----
