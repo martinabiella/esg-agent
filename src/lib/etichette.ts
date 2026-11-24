@@ -1,5 +1,6 @@
 import type { giurisdizione, provenienza, stato } from "@/db/schema";
 import type { Applicabilita } from "./applicabilita";
+import type { EsitoEsecuzione } from "./esecuzione";
 import type { ControlloFonte, TipoFonte } from "./fonte";
 import type { TipoAtto } from "./tipi-atto";
 
@@ -53,6 +54,12 @@ export const etichettaControlloFonte: Record<ControlloFonte["esito"], string> = 
   controllata: "Controllata",
   non_leggibile: "Non leggibile",
   saltata_per_tetto: "Saltata per tetto",
+};
+
+export const etichettaEsitoEsecuzione: Record<EsitoEsecuzione["stato"], string> = {
+  in_corso: "In corso",
+  completata: "Completata",
+  fonti_non_leggibili: "Fonti non leggibili",
 };
 
 export const etichettaApplicabilita: Record<Applicabilita, string> = {

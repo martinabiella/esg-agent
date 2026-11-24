@@ -96,6 +96,9 @@ export const fonte = pgTable(
   ],
 );
 
+// Gli stessi spazi di /\s/ in chiaveIdentificativo (src/lib/atto-citato.ts).
+const spaziIdentificativo = sql.raw(String.raw`U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]+'`);
+
 export const attoNormativo = pgTable("atto_normativo", {
   id: serial("id").primaryKey(),
   titolo: text("titolo").notNull(),
@@ -124,16 +127,31 @@ export const attoNormativo = pgTable("atto_normativo", {
   statoConfermatoIl: timestamp("stato_confermato_il"),
   creatoIl: timestamp("creato_il").notNull().defaultNow(),
   aggiornatoIl: timestamp("aggiornato_il").notNull().defaultNow(),
-});
+}, (t) => [
+  uniqueIndex("atto_normativo_identificativo_normalizzato_idx")
+    .on(sql`upper(regexp_replace(${t.identificativoUfficiale}, ${spaziIdentificativo}, '', 'g'))`),
+]);
 
-export const statoStorico = pgTable("stato_storico", {
-  id: serial("id").primaryKey(),
-  attoId: integer("atto_id")
-    .notNull()
-    .references(() => attoNormativo.id, { onDelete: "cascade" }),
-  stato: stato("stato").notNull(),
-  data: date("data").notNull(),
-});
+export const statoStorico = pgTable(
+  "stato_storico",
+  {
+    id: serial("id").primaryKey(),
+    attoId: integer("atto_id")
+      .notNull()
+      .references(() => attoNormativo.id, { onDelete: "cascade" }),
+    stato: stato("stato").notNull(),
+    data: date("data").notNull(),
+    // Chi ha registrato il cambio: «agente» per quelli rilevati da una Fonte ufficiale.
+    provenienza: provenienza("provenienza").notNull().default("persona"),
+    // Quando una persona ha visto il cambio dell'agente (Avviso di conferma): null = non visto.
+    vistoIl: timestamp("visto_il"),
+  },
+  (t) => [
+    uniqueIndex("stato_storico_agente_atto_stato_data_idx")
+      .on(t.attoId, t.stato, t.data)
+      .where(sql`${t.provenienza} = 'agente'`),
+  ],
+);
 
 export const relazioneAtti = pgTable(
   "relazione_atti",
@@ -237,6 +255,9 @@ export const notizia = pgTable("notizia", {
   // Suggerisce modifiche a un Atto esistente o discute una nuova normativa.
   // Lo imposta solo l'agente.
   segnalaNovita: boolean("segnala_novita").notNull().default(false),
+  // Quando una persona l'ha segnata controllata (Avviso di conferma): vale per le
+  // Notizie senza Atti collegati; per le altre conta notizia_atto.controllata_il.
+  controllataIl: timestamp("controllata_il"),
   creatoIl: timestamp("creato_il").notNull().defaultNow(),
 });
 
@@ -249,6 +270,8 @@ export const notiziaAtto = pgTable(
     attoId: integer("atto_id")
       .notNull()
       .references(() => attoNormativo.id, { onDelete: "cascade" }),
+    // Quando una persona ha controllato l'Atto a proposito di questa Notizia: null = da controllare.
+    controllataIl: timestamp("controllata_il"),
   },
   (t) => [primaryKey({ columns: [t.notiziaId, t.attoId] })],
 );

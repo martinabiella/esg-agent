@@ -1,0 +1,1196 @@
+{
+  "id": "3b89d8cf-2a47-4ad2-852d-20dd5532839b",
+  "prevId": "5cfc0e11-9839-4bff-93a1-e46364f2a671",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.atto_normativo": {
+      "name": "atto_normativo",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "titolo": {
+          "name": "titolo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "identificativo_ufficiale": {
+          "name": "identificativo_ufficiale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "giurisdizione": {
+          "name": "giurisdizione",
+          "type": "giurisdizione",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_atto",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stato": {
+          "name": "stato",
+          "type": "stato",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "url_testo": {
+          "name": "url_testo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criteri_soglie": {
+          "name": "criteri_soglie",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criteri_testo": {
+          "name": "criteri_testo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "criteri_confermati": {
+          "name": "criteri_confermati",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "tutti_i_settori": {
+          "name": "tutti_i_settori",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "non_rilevante": {
+          "name": "non_rilevante",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "recepimento_entro": {
+          "name": "recepimento_entro",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provenienza_contenuti": {
+          "name": "provenienza_contenuti",
+          "type": "provenienza",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'persona'"
+        },
+        "fonte_id": {
+          "name": "fonte_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stato_confermato_il": {
+          "name": "stato_confermato_il",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creato_il": {
+          "name": "creato_il",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "aggiornato_il": {
+          "name": "aggiornato_il",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "atto_normativo_identificativo_normalizzato_idx": {
+          "name": "atto_normativo_identificativo_normalizzato_idx",
+          "columns": [
+            {
+              "expression": "upper(regexp_replace(\"identificativo_ufficiale\", U&'[\\0009-\\000D\\0020\\00A0\\1680\\2000-\\200A\\2028\\2029\\202F\\205F\\3000\\FEFF]+', '', 'g'))",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "atto_normativo_fonte_id_fonte_id_fk": {
+          "name": "atto_normativo_fonte_id_fonte_id_fk",
+          "tableFrom": "atto_normativo",
+          "tableTo": "fonte",
+          "columnsFrom": [
+            "fonte_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "atto_normativo_identificativo_ufficiale_unique": {
+          "name": "atto_normativo_identificativo_ufficiale_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "identificativo_ufficiale"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.atto_settore": {
+      "name": "atto_settore",
+      "schema": "",
+      "columns": {
+        "atto_id": {
+          "name": "atto_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "settore_id": {
+          "name": "settore_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "atto_settore_atto_id_atto_normativo_id_fk": {
+          "name": "atto_settore_atto_id_atto_normativo_id_fk",
+          "tableFrom": "atto_settore",
+          "tableTo": "atto_normativo",
+          "columnsFrom": [
+            "atto_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "atto_settore_settore_id_settore_id_fk": {
+          "name": "atto_settore_settore_id_settore_id_fk",
+          "tableFrom": "atto_settore",
+          "tableTo": "settore",
+          "columnsFrom": [
+            "settore_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "atto_settore_atto_id_settore_id_pk": {
+          "name": "atto_settore_atto_id_settore_id_pk",
+          "columns": [
+            "atto_id",
+            "settore_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.atto_tema": {
+      "name": "atto_tema",
+      "schema": "",
+      "columns": {
+        "atto_id": {
+          "name": "atto_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tema_id": {
+          "name": "tema_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "atto_tema_atto_id_atto_normativo_id_fk": {
+          "name": "atto_tema_atto_id_atto_normativo_id_fk",
+          "tableFrom": "atto_tema",
+          "tableTo": "atto_normativo",
+          "columnsFrom": [
+            "atto_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "atto_tema_tema_id_tema_id_fk": {
+          "name": "atto_tema_tema_id_tema_id_fk",
+          "tableFrom": "atto_tema",
+          "tableTo": "tema",
+          "columnsFrom": [
+            "tema_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "atto_tema_atto_id_tema_id_pk": {
+          "name": "atto_tema_atto_id_tema_id_pk",
+          "columns": [
+            "atto_id",
+            "tema_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cliente": {
+      "name": "cliente",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ragione_sociale": {
+          "name": "ragione_sociale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attivita_specifica": {
+          "name": "attivita_specifica",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dipendenti": {
+          "name": "dipendenti",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fatturato": {
+          "name": "fatturato",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "anno_riferimento": {
+          "name": "anno_riferimento",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paesi": {
+          "name": "paesi",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creato_il": {
+          "name": "creato_il",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cliente_settore": {
+      "name": "cliente_settore",
+      "schema": "",
+      "columns": {
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "settore_id": {
+          "name": "settore_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cliente_settore_cliente_id_cliente_id_fk": {
+          "name": "cliente_settore_cliente_id_cliente_id_fk",
+          "tableFrom": "cliente_settore",
+          "tableTo": "cliente",
+          "columnsFrom": [
+            "cliente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cliente_settore_settore_id_settore_id_fk": {
+          "name": "cliente_settore_settore_id_settore_id_fk",
+          "tableFrom": "cliente_settore",
+          "tableTo": "settore",
+          "columnsFrom": [
+            "settore_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "cliente_settore_cliente_id_settore_id_pk": {
+          "name": "cliente_settore_cliente_id_settore_id_pk",
+          "columns": [
+            "cliente_id",
+            "settore_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.esecuzione_ricerca": {
+      "name": "esecuzione_ricerca",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_ricerca",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fonte_id": {
+          "name": "fonte_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tema_id": {
+          "name": "tema_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parallel_run_id": {
+          "name": "parallel_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avviata_il": {
+          "name": "avviata_il",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "terminata_il": {
+          "name": "terminata_il",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "esito": {
+          "name": "esito",
+          "type": "esito_ricerca",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'in_corso'"
+        },
+        "notizie_create": {
+          "name": "notizie_create",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "atti_creati": {
+          "name": "atti_creati",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "errore": {
+          "name": "errore",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "esecuzione_ricerca_fonte_idx": {
+          "name": "esecuzione_ricerca_fonte_idx",
+          "columns": [
+            {
+              "expression": "fonte_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "avviata_il",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "esecuzione_ricerca_fonte_id_fonte_id_fk": {
+          "name": "esecuzione_ricerca_fonte_id_fonte_id_fk",
+          "tableFrom": "esecuzione_ricerca",
+          "tableTo": "fonte",
+          "columnsFrom": [
+            "fonte_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "esecuzione_ricerca_tema_id_tema_id_fk": {
+          "name": "esecuzione_ricerca_tema_id_tema_id_fk",
+          "tableFrom": "esecuzione_ricerca",
+          "tableTo": "tema",
+          "columnsFrom": [
+            "tema_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "esecuzione_ricerca_parallel_run_id_unique": {
+          "name": "esecuzione_ricerca_parallel_run_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "parallel_run_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "esecuzione_ricerca_riferimento_check": {
+          "name": "esecuzione_ricerca_riferimento_check",
+          "value": "(\"esecuzione_ricerca\".\"tipo\" = 'per_fonte' AND \"esecuzione_ricerca\".\"tema_id\" IS NULL) OR (\"esecuzione_ricerca\".\"tipo\" = 'per_tema' AND \"esecuzione_ricerca\".\"fonte_id\" IS NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.fonte": {
+      "name": "fonte",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_fonte",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url_modificato_il": {
+          "name": "url_modificato_il",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "creato_il": {
+          "name": "creato_il",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "fonte_url_chiave_idx": {
+          "name": "fonte_url_chiave_idx",
+          "columns": [
+            {
+              "expression": "lower(rtrim(\"url\", '/'))",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fonte_nome_lower_idx": {
+          "name": "fonte_nome_lower_idx",
+          "columns": [
+            {
+              "expression": "lower(\"nome\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notizia": {
+      "name": "notizia",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "titolo": {
+          "name": "titolo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fonte": {
+          "name": "fonte",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "riassunto": {
+          "name": "riassunto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "provenienza_contenuti": {
+          "name": "provenienza_contenuti",
+          "type": "provenienza",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'persona'"
+        },
+        "segnala_novita": {
+          "name": "segnala_novita",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "creato_il": {
+          "name": "creato_il",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "notizia_url_unique": {
+          "name": "notizia_url_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "url"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notizia_atto": {
+      "name": "notizia_atto",
+      "schema": "",
+      "columns": {
+        "notizia_id": {
+          "name": "notizia_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "atto_id": {
+          "name": "atto_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "notizia_atto_notizia_id_notizia_id_fk": {
+          "name": "notizia_atto_notizia_id_notizia_id_fk",
+          "tableFrom": "notizia_atto",
+          "tableTo": "notizia",
+          "columnsFrom": [
+            "notizia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "notizia_atto_atto_id_atto_normativo_id_fk": {
+          "name": "notizia_atto_atto_id_atto_normativo_id_fk",
+          "tableFrom": "notizia_atto",
+          "tableTo": "atto_normativo",
+          "columnsFrom": [
+            "atto_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "notizia_atto_notizia_id_atto_id_pk": {
+          "name": "notizia_atto_notizia_id_atto_id_pk",
+          "columns": [
+            "notizia_id",
+            "atto_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.override_applicabilita": {
+      "name": "override_applicabilita",
+      "schema": "",
+      "columns": {
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "atto_id": {
+          "name": "atto_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "esito": {
+          "name": "esito",
+          "type": "esito_override",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motivazione": {
+          "name": "motivazione",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "autore": {
+          "name": "autore",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creato_il": {
+          "name": "creato_il",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "override_applicabilita_cliente_id_cliente_id_fk": {
+          "name": "override_applicabilita_cliente_id_cliente_id_fk",
+          "tableFrom": "override_applicabilita",
+          "tableTo": "cliente",
+          "columnsFrom": [
+            "cliente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "override_applicabilita_atto_id_atto_normativo_id_fk": {
+          "name": "override_applicabilita_atto_id_atto_normativo_id_fk",
+          "tableFrom": "override_applicabilita",
+          "tableTo": "atto_normativo",
+          "columnsFrom": [
+            "atto_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "override_applicabilita_cliente_id_atto_id_pk": {
+          "name": "override_applicabilita_cliente_id_atto_id_pk",
+          "columns": [
+            "cliente_id",
+            "atto_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.relazione_atti": {
+      "name": "relazione_atti",
+      "schema": "",
+      "columns": {
+        "da_atto_id": {
+          "name": "da_atto_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "a_atto_id": {
+          "name": "a_atto_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_relazione",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "relazione_atti_da_atto_id_atto_normativo_id_fk": {
+          "name": "relazione_atti_da_atto_id_atto_normativo_id_fk",
+          "tableFrom": "relazione_atti",
+          "tableTo": "atto_normativo",
+          "columnsFrom": [
+            "da_atto_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "relazione_atti_a_atto_id_atto_normativo_id_fk": {
+          "name": "relazione_atti_a_atto_id_atto_normativo_id_fk",
+          "tableFrom": "relazione_atti",
+          "tableTo": "atto_normativo",
+          "columnsFrom": [
+            "a_atto_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "relazione_atti_da_atto_id_a_atto_id_tipo_pk": {
+          "name": "relazione_atti_da_atto_id_a_atto_id_tipo_pk",
+          "columns": [
+            "da_atto_id",
+            "a_atto_id",
+            "tipo"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.settore": {
+      "name": "settore",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descrizione": {
+          "name": "descrizione",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        }
+      },
+      "indexes": {
+        "settore_nome_lower_idx": {
+          "name": "settore_nome_lower_idx",
+          "columns": [
+            {
+              "expression": "lower(\"nome\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.stato_storico": {
+      "name": "stato_storico",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "atto_id": {
+          "name": "atto_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stato": {
+          "name": "stato",
+          "type": "stato",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "stato_storico_atto_id_atto_normativo_id_fk": {
+          "name": "stato_storico_atto_id_atto_normativo_id_fk",
+          "tableFrom": "stato_storico",
+          "tableTo": "atto_normativo",
+          "columnsFrom": [
+            "atto_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tema": {
+      "name": "tema",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "tema_nome_lower_idx": {
+          "name": "tema_nome_lower_idx",
+          "columns": [
+            {
+              "expression": "lower(\"nome\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.esito_override": {
+      "name": "esito_override",
+      "schema": "public",
+      "values": [
+        "applicabile",
+        "non_applicabile"
+      ]
+    },
+    "public.esito_ricerca": {
+      "name": "esito_ricerca",
+      "schema": "public",
+      "values": [
+        "in_corso",
+        "completata",
+        "fallita",
+        "saltata_per_tetto"
+      ]
+    },
+    "public.giurisdizione": {
+      "name": "giurisdizione",
+      "schema": "public",
+      "values": [
+        "ue",
+        "italia"
+      ]
+    },
+    "public.provenienza": {
+      "name": "provenienza",
+      "schema": "public",
+      "values": [
+        "fonte_ufficiale",
+        "agente",
+        "persona"
+      ]
+    },
+    "public.stato": {
+      "name": "stato",
+      "schema": "public",
+      "values": [
+        "proposta",
+        "in_discussione",
+        "approvato",
+        "in_vigore",
+        "modificato",
+        "abrogato"
+      ]
+    },
+    "public.tipo_atto": {
+      "name": "tipo_atto",
+      "schema": "public",
+      "values": [
+        "regolamento",
+        "direttiva",
+        "decisione",
+        "legge",
+        "decreto_legislativo",
+        "decreto",
+        "disegno_di_legge",
+        "altro"
+      ]
+    },
+    "public.tipo_fonte": {
+      "name": "tipo_fonte",
+      "schema": "public",
+      "values": [
+        "ufficiale",
+        "editoriale"
+      ]
+    },
+    "public.tipo_relazione": {
+      "name": "tipo_relazione",
+      "schema": "public",
+      "values": [
+        "recepisce",
+        "modifica",
+        "sostituisce"
+      ]
+    },
+    "public.tipo_ricerca": {
+      "name": "tipo_ricerca",
+      "schema": "public",
+      "values": [
+        "per_fonte",
+        "per_tema"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

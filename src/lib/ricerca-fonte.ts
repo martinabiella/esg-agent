@@ -1,0 +1,371 @@
+// Ricerca per Fonte: l'avvio su Parallel e l'elaborazione del webhook che ne
+// porta il risultato (ADR 0002). Client Parallel e database arrivano come
+// dipendenze: nei test si usano versioni finte.
+// Vocabolario: vedi GLOSSARY.md
+
+import { z } from "zod";
+import type { esitoRicerca } from "../db/schema";
+import { type AttoDaCreare, type SettoreCatalogo, decidiAttiNuovi } from "./atti-nuovi";
+import { type AttoCatalogo, chiaveIdentificativo, trovaAttoCitato } from "./atto-citato";
+import { type CambioApplicato, type StatoAtto, decidiCambiDiStato } from "./cambi-di-stato";
+import type { TipoFonte } from "./fonte";
+import {
+  type NotiziaTrovata,
+  VERSIONE_OUTPUT,
+  VERSIONI_LEGGIBILI,
+  schemaOutputParallel,
+  validaOutputRicerca,
+} from "./output-ricerca";
+import { type ClientParallel, ErroreParallel, type RichiestaTaskRun } from "./parallel";
+
+const GIORNI_PRIMA_RICERCA = 30;
+const UN_GIORNO_MS = 24 * 60 * 60 * 1000;
+
+// Processore della Task API: "core" regge output di media complessità (un
+// elenco di Notizie con gli Atti citati) in pochi minuti.
+const PROCESSORE = "core";
+
+export type FonteRicerca = { id: number; nome: string; url: string; tipo: TipoFonte };
+
+// Dall'enum esito_ricerca del database (import solo di tipo: i test non
+// caricano il DB).
+export type EsitoRicerca = (typeof esitoRicerca.enumValues)[number];
+
+// Una Ricerca registrata in corso, senza run, dall'esecuzione (src/lib/esecuzione.ts).
+export type RicercaRegistrata = { id: number; avviataIl: Date };
+
+// Una Notizia trovata dall'agente, pronta per il salvataggio.
+export type NotiziaDaSalvare = {
+  titolo: string;
+  // Chi ha pubblicato la Notizia (colonna notizia.fonte): non è la Fonte monitorata.
+  pubblicataDa: string;
+  data: string | null;
+  url: string;
+  riassunto: string;
+  segnalaNovita: boolean;
+  atti: number[];
+  // Identificativi di Atti che questa stessa scrittura crea (AttoDaCreare):
+  // la Notizia si collega anche a loro.
+  attiNuovi: string[];
+};
+
+// Un Settore del catalogo, con la descrizione che aiuta l'agente a sceglierlo.
+export type SettoreConDescrizione = SettoreCatalogo & { descrizione: string };
+
+// Le letture e scritture sul database che servono alle Ricerche.
+export interface ArchivioRicerche {
+  // avviata_il dell'ultima Ricerca riuscita dopo l'ultimo cambio di URL.
+  ultimaRicercaRiuscita(fonteId: number): Promise<Date | null>;
+  // Il run Parallel di una Ricerca registrata prima dell'avvio.
+  assegnaRun(ricercaId: number, runId: string): Promise<void>;
+  ricercaPerRunId(runId: string): Promise<{ id: number; esito: EsitoRicerca } | null>;
+  attiCatalogo(): Promise<AttoCatalogo[]>;
+  // Stato attuale e data dell'ultima voce dello storico di ogni Atto.
+  statiAtti(): Promise<StatoAtto[]>;
+  settoriCatalogo(): Promise<SettoreConDescrizione[]>;
+  nomiTemi(): Promise<string[]>;
+  // Atomica: crea gli Atti nuovi (quelli con identificativo già presente si
+  // saltano) con Settori, Temi e storico dello Stato, salva le Notizie nuove
+  // (gli URL già presenti si saltano) con i collegamenti, applica i cambi di
+  // Stato (con riga nello storico e data di conferma) e chiude la Ricerca come
+  // completata. null se la Ricerca non era più in corso: nulla è stato scritto.
+  completaRicerca(
+    id: number,
+    notizie: NotiziaDaSalvare[],
+    atti: AttoDaCreare[],
+    cambiDiStato: CambioApplicato[],
+  ): Promise<{ notizieCreate: number; attiCreati: number; cambiDiStato: number } | null>;
+  // false se la Ricerca non era più in corso. `errore` compare agli utenti come
+  // motivo: italiano leggibile, niente dettagli tecnici.
+  segnaFallita(id: number, errore: string): Promise<boolean>;
+}
+
+export type DipendenzeRicerca = {
+  client: ClientParallel;
+  archivio: ArchivioRicerche;
+  // Dove Parallel manda il webhook a fine run.
+  urlWebhook: string;
+  ora: () => Date;
+};
+
+// Data da cui cercare (after_date di Parallel, AAAA-MM-GG in UTC): il giorno in
+// cui è stata avviata l'ultima Ricerca riuscita, altrimenti gli ultimi 30
+// giorni. Un run fallito non sposta la finestra; il cambio di URL della Fonte
+// lo gestisce ultimaRicercaRiuscita, che ignora le Ricerche precedenti.
+export function finestraRicerca(ultimaRiuscitaAvviataIl: Date | null, ora: Date): string {
+  const dal = ultimaRiuscitaAvviataIl ?? new Date(ora.getTime() - GIORNI_PRIMA_RICERCA * UN_GIORNO_MS);
+  return dal.toISOString().slice(0, 10);
+}
+
+// Il dominio della Fonte, sottodomini compresi (source_policy di Parallel).
+function dominio(url: string): string {
+  return new URL(url).hostname.replace(/^www\./, "");
+}
+
+function istruzioni(
+  fonte: FonteRicerca,
+  dal: string,
+  settori: readonly SettoreConDescrizione[],
+  temi: readonly string[],
+): string {
+  const tipo = fonte.tipo === "ufficiale" ? "una fonte ufficiale" : "una fonte editoriale";
+  return [
+    `Sei un analista di normativa di sostenibilità (ESG) per un team di consulenza italiano.`,
+    `Esamina «${fonte.nome}» (${fonte.url}), ${tipo}.`,
+    `Elenca gli articoli, i comunicati e le pagine pubblicati da questa fonte dal ${dal} a oggi che riguardano normativa di sostenibilità dell'Unione europea o italiana: proposte, direttive, regolamenti, decisioni, leggi, decreti, disegni di legge, il loro iter, recepimenti, rinvii e modifiche.`,
+    `Ignora i contenuti che non riguardano normativa di sostenibilità.`,
+    `Ignora anche gli atti di esecuzione di routine che riguardano una singola sostanza, un singolo prodotto o una singola autorizzazione (per esempio l'approvazione o il rinnovo di una sostanza attiva biocida): non ne fare né una Notizia né un atto candidato. Restano invece di interesse gli atti generali (regolamenti e direttive quadro) quando la fonte li modifica o ne parla.`,
+    `Per ogni articolo riporta gli atti normativi citati con il loro identificativo ufficiale (CELEX, COM, numero e anno), anche se l'articolo non lo scrive, purché tu ne sia certo. Non riportare come atti rapporti, consultazioni o documenti di lavoro.`,
+    `Elenca in atti_candidati ogni atto normativo con identificativo ufficiale citato negli articoli, una sola volta anche se citato in più articoli, con i dati ricavati dal testo ufficiale quando lo trovi. Se due articoli sono in disaccordo su un dato (per esempio lo Stato), scegli la versione della fonte più autorevole e descrivi il disaccordo in discrepanze, indicando chi dice cosa. In da_notizia metti l'URL dell'articolo da cui hai preso i dati. Non elencare gli atti abrogati.`,
+    `In cambi_di_stato elenca gli atti di cui la fonte riporta un nuovo stato dell'iter (per esempio «entrato in vigore», «modificato», «abrogato») con la data del cambio e l'identificativo ufficiale; anche gli atti abrogati vanno qui. Non indovinare: solo cambi che la fonte afferma e data alla mano.`,
+    `Per i settori usa solo i nomi di questo elenco, mai nomi nuovi; se nessuno calza lascia l'elenco vuoto, e usa tutti_i_settori solo se l'atto vale per tutta l'economia:`,
+    ...settori.map((s) => `- ${s.nome}${s.descrizione ? `: ${s.descrizione}` : ""}`),
+    ...(temi.length > 0
+      ? [`Per i temi riusa quando possono calzare i nomi già in uso: ${temi.join(", ")}. Aggiungine di nuovi solo se nessuno calza.`]
+      : []),
+  ].join("\n");
+}
+
+export type EsitoAvvio =
+  | { esito: "avviata"; ricercaId: number; runId: string }
+  | { esito: "fallita"; errore: string };
+
+// Il motivo compare agli utenti nella pagina Fonti: niente messaggi tecnici.
+// I dettagli restano nel log del server.
+function motivoAvvioFallito(e: unknown): string {
+  if (!(e instanceof ErroreParallel)) return "Parallel non è raggiungibile: la Ricerca non è partita.";
+  const motivo =
+    e.stato === 401 || e.stato === 403
+      ? "chiave API rifiutata"
+      : e.stato === 402
+        ? "credito esaurito"
+        : e.stato === 429
+          ? "troppe richieste, riprova più tardi"
+          : e.stato >= 500
+            ? "servizio non disponibile"
+            : "richiesta non valida";
+  return `Parallel non ha avviato la Ricerca: ${motivo}.`;
+}
+
+const RUN_NON_REGISTRATO =
+  "La Ricerca è partita su Parallel ma non è stato possibile registrarla: il risultato andrà perso.";
+
+// Avvia su Parallel una Ricerca già registrata in corso e le assegna il run.
+// Registrarla prima evita run senza traccia nel log. Se è l'assegnazione del
+// run a non riuscire, il webhook non troverà la Ricerca: il run resta nel log
+// del server e la Ricerca, se si riesce ancora a scriverla, risulta fallita.
+export async function avviaRicercaPerFonte(
+  fonte: FonteRicerca,
+  ricerca: RicercaRegistrata,
+  deps: DipendenzeRicerca,
+): Promise<EsitoAvvio> {
+  const [ultimaRiuscita, settori, temi] = await Promise.all([
+    deps.archivio.ultimaRicercaRiuscita(fonte.id),
+    deps.archivio.settoriCatalogo(),
+    deps.archivio.nomiTemi(),
+  ]);
+  const dal = finestraRicerca(ultimaRiuscita, ricerca.avviataIl);
+  // Fuori dal try: un errore di configurazione (URL del webhook mancante) non
+  // è un problema di Parallel e non va registrato come tale.
+  const richiesta: RichiestaTaskRun = {
+    input: istruzioni(fonte, dal, settori, temi),
+    processor: PROCESSORE,
+    task_spec: { output_schema: { type: "json", json_schema: schemaOutputParallel() } },
+    source_policy: { include_domains: [dominio(fonte.url)], after_date: dal },
+    metadata: { fonte_id: fonte.id, fonte_nome: fonte.nome, fonte_tipo: fonte.tipo, versione_schema: VERSIONE_OUTPUT },
+    webhook: { url: deps.urlWebhook, event_types: ["task_run.status"] },
+  };
+
+  let runId: string;
+  try {
+    ({ runId } = await deps.client.avviaTaskRun(richiesta));
+  } catch (e) {
+    console.error(`Avvio della Ricerca per la Fonte ${fonte.id} non riuscito`, e);
+    const errore = motivoAvvioFallito(e);
+    await deps.archivio.segnaFallita(ricerca.id, errore);
+    return { esito: "fallita", errore };
+  }
+
+  try {
+    await deps.archivio.assegnaRun(ricerca.id, runId);
+  } catch (e) {
+    console.error(`Run Parallel ${runId} avviato ma non assegnato alla Ricerca ${ricerca.id}`, e);
+    await deps.archivio.segnaFallita(ricerca.id, RUN_NON_REGISTRATO);
+    return { esito: "fallita", errore: RUN_NON_REGISTRATO };
+  }
+  return { esito: "avviata", ricercaId: ricerca.id, runId };
+}
+
+// ---- Webhook di fine run ----
+
+export type EsitoWebhook =
+  // notizieScartate: Notizie dell'output che non superavano i controlli.
+  | { esito: "completata"; notizieCreate: number; notizieScartate: number; attiCreati: number; cambiDiStato: number }
+  | { esito: "fallita"; errore: string }
+  // Evento che non riguarda una Ricerca da chiudere: si conferma e basta.
+  | { esito: "ignorato"; motivo: string }
+  // Run che il log non conosce: può arrivare prima che l'avvio l'abbia
+  // registrato, quindi Parallel deve riprovare.
+  | { esito: "sconosciuta" };
+
+const GIA_ELABORATA: EsitoWebhook = { esito: "ignorato", motivo: "Ricerca già elaborata" };
+
+// Una Notizia ripetuta nell'output (stesso URL normalizzato) conta una volta.
+function senzaDoppioni(notizie: readonly NotiziaTrovata[]): NotiziaTrovata[] {
+  const visti = new Set<string>();
+  return notizie.filter((n) => !visti.has(n.url) && visti.add(n.url));
+}
+
+// Collega gli Atti riconosciuti con certezza. Un Atto citato con identificativo
+// ufficiale ma assente dal catalogo, o un Atto ambiguo, fa segnalare una
+// novità: Parallel non conosce il catalogo, quindi lo decide il codice. Una
+// norma citata solo per nome e non trovata non basta: vale il giudizio
+// dell'agente. Un Atto Non rilevante non si collega e non fa scattare la
+// segnalazione; una Notizia che cita solo Atti Non rilevanti non segnala mai
+// una novità, così non entra nell'Avviso di conferma.
+// «Pubblicata da»: l'editore indicato dall'agente, altrimenti il nome della
+// Fonte (o, se manca anche quello, il dominio della Notizia).
+// Un Atto che questa stessa scrittura crea conta come novità: la Notizia che lo
+// cita mantiene il flag e si collega al nuovo Atto (via attiNuovi).
+function notizieDaSalvare(
+  notizie: readonly NotiziaTrovata[],
+  atti: readonly AttoCatalogo[],
+  nomeFonte: string,
+  daCreare: readonly AttoDaCreare[],
+): NotiziaDaSalvare[] {
+  const nuovi = new Map(daCreare.map((a) => [chiaveIdentificativo(a.identificativoUfficiale), a.identificativoUfficiale]));
+  return senzaDoppioni(notizie).map((n) => {
+    const esiti = n.attiCitati.map((c) => trovaAttoCitato(c, atti));
+    const collegati = esiti.flatMap((e) => (e.esito === "collegato" ? [e.attoId] : []));
+    const attiNuovi = [
+      ...new Set(
+        n.attiCitati.flatMap((c) => {
+          const nuovo = c.identificativoUfficiale ? nuovi.get(chiaveIdentificativo(c.identificativoUfficiale.trim())) : undefined;
+          return nuovo ? [nuovo] : [];
+        }),
+      ),
+    ];
+    const daControllare = esiti.some(
+      (e, i) => e.esito === "ambiguo" || (e.esito === "assente" && n.attiCitati[i].identificativoUfficiale !== null),
+    );
+    const soloNonRilevanti = esiti.length > 0 && esiti.every((e) => e.esito === "non_rilevante");
+    return {
+      titolo: n.titolo,
+      pubblicataDa: n.pubblicataDa ?? (nomeFonte || new URL(n.url).hostname),
+      data: n.data,
+      url: n.url,
+      riassunto: n.riassunto,
+      segnalaNovita: !soloNonRilevanti && (n.segnalaNovita || daControllare),
+      atti: [...new Set(collegati)],
+      attiNuovi,
+    };
+  });
+}
+
+// Payload del webhook: { timestamp, type, data: TaskRun }. Solo i campi usati.
+const eventoStato = z.object({
+  type: z.literal("task_run.status"),
+  data: z.object({
+    run_id: z.string().min(1),
+    status: z.string(),
+    error: z.object({ message: z.string().nullish() }).nullish(),
+  }),
+});
+
+// Stati finali di un task run: gli altri (queued, running…) non chiudono nulla.
+const STATI_CONCLUSI = ["completed", "failed", "cancelled"] as const;
+type StatoConcluso = (typeof STATI_CONCLUSI)[number];
+
+function statoConcluso(stato: string): stato is StatoConcluso {
+  return (STATI_CONCLUSI as readonly string[]).includes(stato);
+}
+
+// Il messaggio di Parallel (in inglese, tecnico) resta nel log del server.
+function motivoRunNonCompletato(stato: Exclude<StatoConcluso, "completed">): string {
+  return stato === "cancelled"
+    ? "La Ricerca è stata annullata su Parallel."
+    : "Parallel non è riuscito a completare la Ricerca.";
+}
+
+// Elabora un evento task_run.status già verificato (firma). Il contenuto
+// arriva dalla Task API, non dal corpo del webhook. Gli errori imprevisti
+// (database, rete) si propagano: la rotta risponde 500 e Parallel riprova.
+export async function elaboraWebhook(evento: unknown, deps: DipendenzeRicerca): Promise<EsitoWebhook> {
+  const letto = eventoStato.safeParse(evento);
+  if (!letto.success) return { esito: "ignorato", motivo: "Evento non riconosciuto" };
+  const { run_id: runId, status, error } = letto.data.data;
+  if (!statoConcluso(status)) return { esito: "ignorato", motivo: `Run non concluso (${status})` };
+
+  const ricerca = await deps.archivio.ricercaPerRunId(runId);
+  if (!ricerca) return { esito: "sconosciuta" };
+  if (ricerca.esito !== "in_corso") return GIA_ELABORATA;
+
+  const fallita = async (errore: string): Promise<EsitoWebhook> => {
+    const chiusa = await deps.archivio.segnaFallita(ricerca.id, errore);
+    return chiusa ? { esito: "fallita", errore } : GIA_ELABORATA;
+  };
+
+  if (status !== "completed") {
+    console.error(`Run Parallel ${runId} concluso con stato ${status}`, error?.message ?? "");
+    return fallita(motivoRunNonCompletato(status));
+  }
+
+  const risultato = await deps.client.risultatoTaskRun(runId);
+  // Un run avviato con la versione precedente e concluso dopo il deploy resta
+  // leggibile: la v1 è una v2 senza candidati.
+  if (!VERSIONI_LEGGIBILI.some((v) => v === risultato.metadata?.versione_schema)) {
+    return fallita(
+      `La Ricerca è stata avviata con un'altra versione dello schema dei risultati (ora v${VERSIONE_OUTPUT}): il risultato non è stato letto.`,
+    );
+  }
+  const output = validaOutputRicerca(risultato.contenuto, deps.ora());
+  if (!output.ok) return fallita(output.errore);
+  for (const s of output.scartate) {
+    console.warn(`Run Parallel ${runId}: Notizia ${s.posizione} scartata (${s.motivo})`);
+  }
+  if (output.notizie.length === 0 && output.scartate.length > 0) {
+    return fallita("Parallel ha restituito solo Notizie non valide.");
+  }
+
+  // Il nome viaggia nei metadati del run: la Fonte potrebbe essere stata
+  // eliminata o rinominata nel frattempo.
+  const nomeFonte = String(risultato.metadata?.fonte_nome ?? "");
+  for (const s of output.candidatiScartati) {
+    console.warn(`Run Parallel ${runId}: candidato Atto ${s.posizione} scartato (${s.motivo})`);
+  }
+  for (const s of output.cambiScartati) {
+    console.warn(`Run Parallel ${runId}: cambio di Stato ${s.posizione} scartato (${s.motivo})`);
+  }
+  const [atti, settori, stati] = await Promise.all([
+    deps.archivio.attiCatalogo(),
+    deps.archivio.settoriCatalogo(),
+    deps.archivio.statiAtti(),
+  ]);
+  const { daCreare, scartati } = decidiAttiNuovi(output.candidati, atti, settori, deps.ora());
+  for (const s of scartati) {
+    console.warn(`Run Parallel ${runId}: «${s.titolo}» non diventa un Atto (${s.motivo})`);
+  }
+  // Una Ricerca avviata prima della v3 non porta il tipo della Fonte: nel dubbio
+  // non cambia nessuno Stato.
+  const tipoFonte = risultato.metadata?.fonte_tipo === "ufficiale" ? "ufficiale" : "editoriale";
+  const cambi = decidiCambiDiStato(output.cambiDiStato, atti, stati, tipoFonte);
+  for (const c of cambi.ignorati) {
+    console.warn(`Run Parallel ${runId}: cambio di Stato di ${c.identificativo} ignorato (${c.motivo})`);
+  }
+  // Un altro recapito dello stesso evento può averla chiusa nel frattempo.
+  const scritto = await deps.archivio.completaRicerca(
+    ricerca.id,
+    notizieDaSalvare(output.notizie, atti, nomeFonte, daCreare),
+    daCreare,
+    cambi.daApplicare,
+  );
+  return scritto
+    ? {
+        esito: "completata",
+        notizieCreate: scritto.notizieCreate,
+        notizieScartate: output.scartate.length,
+        attiCreati: scritto.attiCreati,
+        cambiDiStato: scritto.cambiDiStato,
+      }
+    : GIA_ELABORATA;
+}

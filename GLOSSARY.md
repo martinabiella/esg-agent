@@ -64,9 +64,17 @@ _Avoid_: Aggiornamento, alert, coda di revisione
 Indicazione dell'origine di un contenuto di un Atto normativo: *dalla fonte ufficiale*, *generato dall'agente* o *confermato da una persona*. Vale per gli Atti, non per le Notizie: il riassunto di una Notizia può restare non verificato.
 _Avoid_: Fonte, stato di verifica
 
+**Avviso dell'agente**:
+Le righe che l'agente scrive in testa al summary di un Atto che ha creato: da quale articolo ha preso i dati e, se gli articoli trovati sono in disaccordo su un dato (per esempio lo Stato), che cosa dicono. La scheda dell'Atto le mostra in un riquadro a parte; una persona le toglie cancellando le righe dal summary. Non è una Notizia né un Avviso di conferma.
+_Avoid_: Nota, warning
+
 **Avviso di conferma**:
-Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona, più i cambi di Stato rilevati dall'agente e le Notizie che segnalano una novità (modifiche a Atti esistenti o nuove normative, con la possibilità di creare l'Atto dalla Notizia). Una Notizia esce dall'avviso quando una persona la segna come controllata. Non blocca nulla.
+Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona, più i cambi di Stato rilevati dall'agente e le Notizie che segnalano una novità (modifiche a Atti esistenti o nuove normative, con la possibilità di creare l'Atto dalla Notizia). Si conta per Atto: un Atto con più motivi (contenuti generati, cambio di Stato, Notizia collegata) è una sola voce, e le Notizie senza Atto collegato sono voci a sé. Le voci sono ordinate per impatto sui Clienti (prima gli Atti applicabili a più Clienti, poi quelli da verificare). Un Atto esce dall'avviso quando una persona lo segna **controllato**, una Notizia senza Atto quando la segna controllata o ne crea l'Atto. Una Notizia più vecchia di 30 giorni dal momento in cui l'agente l'ha trovata non vi compare più: se in tutto quel tempo nessuno ha aperto la piattaforma, non è più una novità. Non blocca nulla.
 _Avoid_: Notifica, coda di revisione, task
+
+**Controllato**:
+Un Atto segnato da una persona con un'unica azione per tutto l'Atto: tutti i contenuti generati passano a *confermato da una persona*, i cambi di Stato dell'agente diventano *visti* e le Notizie collegate che segnalano una novità diventano *controllate*. Non esiste una conferma parziale (per esempio solo i Criteri). L'Atto torna nell'Avviso di conferma solo quando l'agente registra qualcosa di nuovo (un altro cambio di Stato, un'altra Notizia che segnala una novità).
+_Avoid_: Approvato, validato, revisionato
 
 **Fonte**:
 Un sito o canale monitorato dall'agente, con un livello di affidabilità: ufficiale (fa fede per Stato e date) oppure editoriale (solo Notizie e scoperta). L'elenco è modificabile dagli utenti: l'agente non aggiunge Fonti da solo. L'*ultimo controllo* di una Fonte dipende dalla sua ultima Ricerca conclusa: *controllata* (completata), *non leggibile* (fallita), *saltata per tetto*, oppure *mai controllata* se non ci sono Ricerche dopo l'ultimo cambio di URL. Non è uno Stato. Non va confusa con chi ha pubblicato una Notizia (nell'app "Pubblicata da"), che è un testo libero.
@@ -77,5 +85,9 @@ Etichetta che una persona assegna a un Atto per escluderlo dalle viste normali e
 _Avoid_: Scartato, archiviato, ignorato
 
 **Ricerca**:
-Un'esecuzione dell'agente. *Per Fonte*: controlla una Fonte dell'elenco (monitora gli Atti esistenti e cerca Notizie e nuovi Atti) a ogni giro. *Per Tema*: cerca sul web, a partire da un Tema, normative e notizie non pubblicate dalle Fonti note.
+Un singolo controllo dell'agente, dentro un'Esecuzione. *Per Fonte*: controlla una Fonte dell'elenco (monitora gli Atti esistenti e cerca Notizie e nuovi Atti) a ogni Esecuzione. *Per Tema*: cerca sul web, a partire da un Tema, normative e notizie non pubblicate dalle Fonti note.
 _Avoid_: Scansione, crawl, job
+
+**Esecuzione**:
+L'insieme delle Ricerche avviate insieme, ogni lunedì mattina o con il pulsante "Avvia ricerca ora". Le Ricerche oltre il tetto non partono e risultano *saltate per tetto*. Ne parte una alla volta: un'Esecuzione è *in corso* finché una sua Ricerca attende il risultato, per al massimo 2 ore. Non ha retry: una Ricerca fallita si recupera all'Esecuzione successiva.
+_Avoid_: Giro, run, batch

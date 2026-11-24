@@ -78,7 +78,7 @@ export type EsitoAtto =
   | { ok: true; valori: CampiAtto }
   | { ok: false; errori: ErroriAtto; valori: ValoriModuloAtto };
 
-const STATI = ["proposta", "in_discussione", "approvato", "in_vigore", "modificato", "abrogato"] as const;
+export const STATI_ATTO = ["proposta", "in_discussione", "approvato", "in_vigore", "modificato", "abrogato"] as const;
 const TIPI_RELAZIONE = ["recepisce", "modifica", "sostituisce"] as const;
 const INT4_MAX = 2147483647;
 
@@ -218,7 +218,7 @@ export function validaAtto(input: Partial<ValoriModuloAtto> & { soglieJson?: str
   const validazioneTipo = validaTipoAtto(valori.tipo, giurisdizione === "ue" ? "ue" : "italia");
   if (giurisdizione !== "ue" && giurisdizione !== "italia") errori.tipo = "Scegli prima una Giurisdizione.";
   else if (!validazioneTipo.ok) errori.tipo = validazioneTipo.errore;
-  if (!STATI.includes(valori.stato as typeof STATI[number])) errori.stato = "Lo Stato è obbligatorio.";
+  if (!STATI_ATTO.includes(valori.stato as typeof STATI_ATTO[number])) errori.stato = "Lo Stato è obbligatorio.";
   if (!dataValida(valori.dataStato)) errori.dataStato = "Indica una data valida.";
   const recepimentoEntro = valori.recepimentoEntro.trim() || null;
   if (recepimentoEntro !== null && !dataValida(recepimentoEntro)) {
