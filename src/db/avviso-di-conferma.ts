@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, isNull, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, notExists, sql } from "drizzle-orm";
 import { db } from "./index";
 import { impattoPerAtto } from "./applicabilita";
 import { cambiDiStatoNonVisti } from "./cambi-di-stato";
@@ -67,7 +67,7 @@ async function righeAvviso(): Promise<RigheAvviso> {
   ]);
   return {
     attiDaConfermare: attiDaConfermare.map((a) => ({ ...a, aggiornatoIl: a.aggiornatoIl.toISOString() })),
-    cambiDiStato: cambi.map((c) => ({ attoId: c.attoId, titolo: c.titolo, stato: c.stato, data: c.data })),
+    cambiDiStato: cambi,
     notizieSuAtti: notizieSuAtti.map((n) => ({ ...n, notiziaCreataIl: n.notiziaCreataIl.toISOString() })),
     notizieSenzaAtto,
   };
@@ -80,10 +80,12 @@ export async function avvisoDiConferma(): Promise<Avviso> {
   return { ...avviso, atti: ordinaPerImpatto(avviso.atti, impatto) };
 }
 
-// Segna controllato un Atto: contenuti generati confermati, cambi di Stato
-// dell'agente visti, Notizie collegate controllate. Un solo batch atomico.
+export type NovitaMostrate = { cambiDiStato: number[]; notizie: number[] };
+
+// Conferma i contenuti e segna come controllati solo i cambi di Stato e le Notizie mostrate.
+// Un solo batch atomico.
 // Non tocca aggiornato_il: confermare non è modificare i Criteri (vedi Override).
-export async function segnaAttoControllato(attoId: number): Promise<boolean> {
+export async function segnaAttoControllato(attoId: number, mostrate: NovitaMostrate): Promise<boolean> {
   const [atti] = await db.batch([
     db
       .update(attoNormativo)
@@ -99,6 +101,7 @@ export async function segnaAttoControllato(attoId: number): Promise<boolean> {
       .where(
         and(
           eq(statoStorico.attoId, attoId),
+          inArray(statoStorico.id, mostrate.cambiDiStato),
           eq(statoStorico.provenienza, "agente"),
           isNull(statoStorico.vistoIl),
         ),
@@ -106,7 +109,13 @@ export async function segnaAttoControllato(attoId: number): Promise<boolean> {
     db
       .update(notiziaAtto)
       .set({ controllataIl: sql`now()` })
-      .where(and(eq(notiziaAtto.attoId, attoId), isNull(notiziaAtto.controllataIl))),
+      .where(
+        and(
+          eq(notiziaAtto.attoId, attoId),
+          inArray(notiziaAtto.notiziaId, mostrate.notizie),
+          isNull(notiziaAtto.controllataIl),
+        ),
+      ),
   ]);
   return atti.length > 0;
 }

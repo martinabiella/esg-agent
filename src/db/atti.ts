@@ -352,7 +352,6 @@ export async function aggiornaAtto(id: number, valori: CampiAtto): Promise<Esito
         INSERT INTO stato_storico (atto_id, stato, data)
         SELECT id, stato, ${valori.dataStato}::date FROM aggiornato
         WHERE stato <> stato_precedente
-        ON CONFLICT (atto_id, stato, data) DO NOTHING
       )
       SELECT id FROM aggiornato`);
     if (risultato.rows.length === 0) return { ok: false, motivo: "non_trovato" };

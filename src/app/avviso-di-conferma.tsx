@@ -1,14 +1,25 @@
 import Link from "next/link";
+import { io } from "next/cache";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { avvisoDiConferma } from "@/db/avviso-di-conferma";
+import { avvisoDiConferma, type NovitaMostrate } from "@/db/avviso-di-conferma";
 import { titoloAvviso } from "@/lib/avviso-di-conferma";
 import { etichettaStato } from "@/lib/etichette";
 import { segnaAttoControllatoAzione, segnaNotiziaControllataAzione } from "./azioni-avviso";
 import { PulsanteControllato } from "./pulsante-controllato";
 
+function PulsanteAttoControllato({ attoId, mostrate }: { attoId: number; mostrate: NovitaMostrate }) {
+  async function segnaMostrate() {
+    "use server";
+    return segnaAttoControllatoAzione(attoId, mostrate);
+  }
+
+  return <PulsanteControllato azione={segnaMostrate} etichetta="Segna come controllato" />;
+}
+
 // Avviso di conferma (vedi GLOSSARY.md): sparisce quando non c'è nulla da controllare.
 export async function AvvisoDiConferma() {
+  await io();
   const { atti, notizie } = await avvisoDiConferma();
   const titolo = titoloAvviso(atti.length, notizie.length);
   if (titolo === null) return null;
@@ -35,7 +46,7 @@ export async function AvvisoDiConferma() {
                   <div className="flex flex-wrap items-center gap-1.5">
                     {atto.contenutiGenerati && <Badge variant="secondary">Contenuti generati da confermare</Badge>}
                     {atto.cambiDiStato.map((c) => (
-                      <Badge key={`${c.stato}-${c.data}`} variant="outline">
+                      <Badge key={c.id} variant="outline">
                         Stato: {etichettaStato[c.stato as keyof typeof etichettaStato] ?? c.stato} ({c.data})
                       </Badge>
                     ))}
@@ -45,7 +56,7 @@ export async function AvvisoDiConferma() {
                       {atto.notizie.map((n) => (
                         <li key={n.id}>
                           Notizia:{" "}
-                          <Link href={`/notizie?id=${n.id}`} className="underline-offset-4 hover:underline">
+                          <Link href={`/notizie?notizia=${n.id}`} className="underline-offset-4 hover:underline">
                             {n.titolo}
                           </Link>
                         </li>
@@ -53,10 +64,12 @@ export async function AvvisoDiConferma() {
                     </ul>
                   )}
                 </div>
-                <PulsanteControllato
-                  azione={segnaAttoControllatoAzione}
-                  id={atto.attoId}
-                  etichetta="Segna come controllato"
+                <PulsanteAttoControllato
+                  attoId={atto.attoId}
+                  mostrate={{
+                    cambiDiStato: atto.cambiDiStato.map((c) => c.id),
+                    notizie: atto.notizie.map((n) => n.id),
+                  }}
                 />
               </li>
             ))}
@@ -71,7 +84,7 @@ export async function AvvisoDiConferma() {
             <ul className="flex flex-col divide-y">
               {notizie.map((n) => (
                 <li key={n.id} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0">
-                  <Link href={`/notizie?id=${n.id}`} className="font-medium hover:underline">
+                  <Link href={`/notizie?notizia=${n.id}`} className="font-medium hover:underline">
                     {n.titolo}
                   </Link>
                   <PulsanteControllato

@@ -188,12 +188,12 @@ test("avviaEsecuzione: senza Fonti non registra nulla", async () => {
   assert.deepEqual(client.richieste, []);
 });
 
-test("avviaEsecuzione: le Ricerche senza risultato da più di 48 ore diventano fallite, le più recenti restano aperte", async () => {
+test("avviaEsecuzione: dopo 48 ore chiude le Ricerche rimaste senza run Parallel", async () => {
   const { archivio, deps } = dipendenze();
   archivio.fonti = [fonte(1, "ufficiale", null)];
   const scaduta = new Date(ORA.getTime() - ORE(48) - 1000);
   const recente = new Date(ORA.getTime() - ORE(45));
-  await avviaEsecuzione({ ...deps, ora: () => scaduta });
+  await archivio.apriEsecuzione({ avviataIl: scaduta, daAvviare: [1], saltate: [], bloccanteDal: scaduta });
   await avviaEsecuzione({ ...deps, ora: () => recente });
 
   await avviaEsecuzione(deps);

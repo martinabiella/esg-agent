@@ -96,6 +96,9 @@ export const fonte = pgTable(
   ],
 );
 
+// Gli stessi spazi di /\s/ in chiaveIdentificativo (src/lib/atto-citato.ts).
+const spaziIdentificativo = sql.raw(String.raw`U&'[\0009-\000D\0020\00A0\1680\2000-\200A\2028\2029\202F\205F\3000\FEFF]+'`);
+
 export const attoNormativo = pgTable("atto_normativo", {
   id: serial("id").primaryKey(),
   titolo: text("titolo").notNull(),
@@ -124,7 +127,10 @@ export const attoNormativo = pgTable("atto_normativo", {
   statoConfermatoIl: timestamp("stato_confermato_il"),
   creatoIl: timestamp("creato_il").notNull().defaultNow(),
   aggiornatoIl: timestamp("aggiornato_il").notNull().defaultNow(),
-});
+}, (t) => [
+  uniqueIndex("atto_normativo_identificativo_normalizzato_idx")
+    .on(sql`upper(regexp_replace(${t.identificativoUfficiale}, ${spaziIdentificativo}, '', 'g'))`),
+]);
 
 export const statoStorico = pgTable(
   "stato_storico",
@@ -140,7 +146,11 @@ export const statoStorico = pgTable(
     // Quando una persona ha visto il cambio dell'agente (Avviso di conferma): null = non visto.
     vistoIl: timestamp("visto_il"),
   },
-  (t) => [uniqueIndex("stato_storico_atto_stato_data_idx").on(t.attoId, t.stato, t.data)],
+  (t) => [
+    uniqueIndex("stato_storico_agente_atto_stato_data_idx")
+      .on(t.attoId, t.stato, t.data)
+      .where(sql`${t.provenienza} = 'agente'`),
+  ],
 );
 
 export const relazioneAtti = pgTable(

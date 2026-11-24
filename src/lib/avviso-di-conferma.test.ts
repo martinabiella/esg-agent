@@ -12,7 +12,7 @@ const vuote: RigheAvviso = {
 test("un Atto con contenuti generati, un cambio di Stato e una Notizia è una sola voce con tre motivi", () => {
   const { atti, notizie } = costruisciAvviso({
     attiDaConfermare: [{ attoId: 1, titolo: "CSDDD Omnibus", aggiornatoIl: "2026-11-01T10:00:00.000Z" }],
-    cambiDiStato: [{ attoId: 1, titolo: "CSDDD Omnibus", stato: "approvato", data: "2026-11-10" }],
+    cambiDiStato: [{ id: 4, attoId: 1, titolo: "CSDDD Omnibus", stato: "approvato", data: "2026-11-10" }],
     notizieSuAtti: [{ notiziaId: 7, notiziaTitolo: "Slitta l'obbligo", notiziaCreataIl: "2026-01-01T00:00:00.000Z", attoId: 1, attoTitolo: "CSDDD Omnibus" }],
     notizieSenzaAtto: [],
   });
@@ -21,7 +21,7 @@ test("un Atto con contenuti generati, un cambio di Stato e una Notizia è una so
     attoId: 1,
     titolo: "CSDDD Omnibus",
     contenutiGenerati: true,
-    cambiDiStato: [{ stato: "approvato", data: "2026-11-10" }],
+    cambiDiStato: [{ id: 4, stato: "approvato", data: "2026-11-10" }],
     notizie: [{ id: 7, titolo: "Slitta l'obbligo" }],
     ultimoMovimento: "2026-11-10",
   });
@@ -31,7 +31,7 @@ test("un Atto con contenuti generati, un cambio di Stato e una Notizia è una so
 test("un Atto che compare solo per un cambio di Stato non ha contenuti generati né Notizie", () => {
   const { atti } = costruisciAvviso({
     ...vuote,
-    cambiDiStato: [{ attoId: 2, titolo: "CSRD", stato: "in_vigore", data: "2026-05-01" }],
+    cambiDiStato: [{ id: 5, attoId: 2, titolo: "CSRD", stato: "in_vigore", data: "2026-05-01" }],
   });
   assert.equal(atti.length, 1);
   assert.equal(atti[0].contenutiGenerati, false);

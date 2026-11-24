@@ -1,5 +1,5 @@
 {
-  "id": "7d46835f-ad49-4e16-9bf1-46de9212eb2d",
+  "id": "3b89d8cf-2a47-4ad2-852d-20dd5532839b",
   "prevId": "5cfc0e11-9839-4bff-93a1-e46364f2a671",
   "version": "7",
   "dialect": "postgresql",
@@ -135,7 +135,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "atto_normativo_identificativo_normalizzato_idx": {
+          "name": "atto_normativo_identificativo_normalizzato_idx",
+          "columns": [
+            {
+              "expression": "upper(regexp_replace(\"identificativo_ufficiale\", U&'[\\0009-\\000D\\0020\\00A0\\1680\\2000-\\200A\\2028\\2029\\202F\\205F\\3000\\FEFF]+', '', 'g'))",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "atto_normativo_fonte_id_fonte_id_fk": {
           "name": "atto_normativo_fonte_id_fonte_id_fk",
@@ -1013,51 +1029,9 @@
           "type": "date",
           "primaryKey": false,
           "notNull": true
-        },
-        "provenienza": {
-          "name": "provenienza",
-          "type": "provenienza",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'persona'"
-        },
-        "visto_il": {
-          "name": "visto_il",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
         }
       },
-      "indexes": {
-        "stato_storico_atto_stato_data_idx": {
-          "name": "stato_storico_atto_stato_data_idx",
-          "columns": [
-            {
-              "expression": "atto_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "stato",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "data",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "stato_storico_atto_id_atto_normativo_id_fk": {
           "name": "stato_storico_atto_id_atto_normativo_id_fk",

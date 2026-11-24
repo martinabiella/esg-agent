@@ -23,10 +23,9 @@ export type FonteElenco = {
 // Per il drawer: anche quanti Atti hanno questa Fonte come origine.
 export type FonteDettaglio = FonteElenco & { attiScoperti: number };
 
-// Per ogni Fonte, l'ultima Ricerca conclusa. Quelle in corso non contano,
-// tranne le scadute (oltre ORE_SCADENZA): sono già fallite anche se la
-// prossima Esecuzione non le ha ancora chiuse. Il confronto con il cambio di
-// URL lo fa controlloFonte.
+// Per ogni Fonte, l'ultima Ricerca conclusa o ancora senza risposta dopo
+// ORE_SCADENZA. In quest'ultimo caso la pagina mostra il ritardo anche se il
+// run accetta ancora un risultato. Il confronto con il cambio di URL lo fa controlloFonte.
 function ultimeRicerche() {
   // avviata_il è UTC senza fuso, come lo scrive Drizzle.
   const scadenza = sql`(now() AT TIME ZONE 'UTC') - make_interval(hours => ${ORE_SCADENZA})`;
@@ -69,7 +68,7 @@ function selezioneFonti() {
 type RigaFonte = Awaited<ReturnType<typeof selezioneFonti>>[number];
 
 function fonteElenco(r: RigaFonte): FonteElenco {
-  // Una Ricerca ancora in corso arriva qui solo se è scaduta.
+  // Un ritardo è mostrato come «Non leggibile» senza chiudere la Ricerca.
   const ultima: UltimaRicerca | null =
     r.esito && r.avviataIl
       ? r.esito === "in_corso"
@@ -188,9 +187,9 @@ export async function creaFonte(valori: CampiFonte): Promise<EsitoScritturaFonte
   }
 }
 
-// Se l'URL cambia davvero (non solo maiuscole o barra finale), la Fonte riparte
-// da "mai controllata": le Ricerche avviate prima non contano più. Il cambio di
-// tipo vale dalla prossima Ricerca.
+// Se cambia l'URL salvato, la Fonte riparte da "mai controllata". La chiave di
+// unicità ignora maiuscole e barra finale, ma nel percorso possono contare.
+// Il cambio di tipo vale dalla prossima Ricerca.
 export async function aggiornaFonte(id: number, valori: CampiFonte): Promise<EsitoScritturaFonte> {
   try {
     const righe = await db
@@ -199,7 +198,7 @@ export async function aggiornaFonte(id: number, valori: CampiFonte): Promise<Esi
         nome: valori.nome,
         url: valori.url,
         tipo: valori.tipo,
-        urlModificatoIl: sql`CASE WHEN ${chiaveUrlFonte(fonte.url)} = ${chiaveUrl(valori.url)}
+        urlModificatoIl: sql`CASE WHEN ${fonte.url} = ${valori.url}
           THEN ${fonte.urlModificatoIl} ELSE now() END`,
       })
       .where(eq(fonte.id, id))

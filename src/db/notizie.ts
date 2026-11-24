@@ -145,10 +145,11 @@ export async function aggiornaNotizia(
         .insert(notiziaAtto)
         .select(
           db
-            .select({
-              notiziaId: notizia.id,
-              attoId: sql<number>`unnest(${elencoInteri(valori.atti)})`.as("atto_id"),
-            })
+           .select({
+             notiziaId: notizia.id,
+             attoId: sql<number>`unnest(${elencoInteri(valori.atti)})`.as("atto_id"),
+             controllataIl: sql<null>`null`.as("controllata_il"),
+           })
             .from(notizia)
             .where(eq(notizia.id, id)),
         )

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, lt, max, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, max, sql } from "drizzle-orm";
 import { db } from "./index";
 import { fontiDaControllare } from "./fonti";
 import { attoNormativo, chiaveNomeFonte, esecuzioneRicerca, fonte, settore, tema } from "./schema";
@@ -65,20 +65,20 @@ export async function ultimaEsecuzione(): Promise<UltimaEsecuzione | null> {
 }
 
 // ---- Archivio per l'agente (src/lib/ricerca-fonte.ts e src/lib/esecuzione.ts) ----
-// Il driver neon-http non ha transazioni interattive: le scritture che vanno
-// insieme stanno in una sola istruzione, quindi atomica.
+// Il driver neon-http non ha transazioni interattive: per più istruzioni
+// atomiche si usa db.batch.
 
 // Atti nuovi e Notizie dell'agente (provenienza_contenuti = 'agente') con
 // collegamenti, poi la chiusura della Ricerca.
 // La riga della Ricerca è bloccata (FOR UPDATE) e deve essere ancora in corso:
 // un secondo recapito dello stesso evento, anche in contemporanea, non scrive
 // nulla. Gli URL già presenti si saltano (vincolo unique su notizia.url) e così
-// gli identificativi già presenti (unique su atto_normativo.identificativo_ufficiale):
+// gli identificativi già presenti (anche con maiuscole o spazi diversi):
 // due Ricerche che propongono lo stesso Atto ne creano uno. Un Atto nuovo nasce
 // con Criteri non confermati e Stato non confermato, da una Fonte; solo gli
 // Atti nati qui ricevono Settori (esistenti), Temi (creati se mancano, senza
-// distinguere le maiuscole); lo Stato dell'agente non entra nello storico. Si collegano alle Notizie
-// solo Atti che esistono ancora e non sono Non rilevanti.
+// distinguere le maiuscole); lo Stato iniziale dell'Atto nuovo non entra nello
+// storico. Si collegano alle Notizie solo Atti che esistono ancora e non sono Non rilevanti.
 async function completaRicerca(
   id: number,
   notizie: NotiziaDaSalvare[],
@@ -110,30 +110,27 @@ async function completaRicerca(
     settori: a.settori,
     temi: a.temi,
   }));
-  const risultato = await db.execute<{ notizie_create: number; atti_creati: number; cambi_di_stato: number }>(sql`
+  const completa = db.execute<{ notizie_create: number; atti_creati: number; cambi_di_stato: number }>(sql`
     WITH ricerca_bloccata AS (
       SELECT id, fonte_id FROM esecuzione_ricerca
       WHERE id = ${id} AND esito = 'in_corso'
       FOR UPDATE
     ), dati_cambi AS (
       SELECT * FROM jsonb_to_recordset(${JSON.stringify(righeCambi)}::jsonb) AS c(atto_id int, stato stato, data date)
-    ), atti_bloccati AS (
-      SELECT a.id, a.stato FROM atto_normativo a
-      WHERE a.id IN (SELECT atto_id FROM dati_cambi) AND NOT a.non_rilevante AND a.stato <> 'abrogato'
-        AND EXISTS (SELECT 1 FROM ricerca_bloccata)
-      FOR UPDATE
     ), cambi_validi AS (
       SELECT c.* FROM dati_cambi c
-      JOIN atti_bloccati a ON a.id = c.atto_id
-      WHERE c.data > COALESCE((SELECT max(s.data) FROM stato_storico s WHERE s.atto_id = c.atto_id), '-infinity'::date)
+      JOIN atto_normativo a ON a.id = c.atto_id
+      WHERE NOT a.non_rilevante AND a.stato <> 'abrogato'
+        AND EXISTS (SELECT 1 FROM ricerca_bloccata)
+        AND c.data > COALESCE((SELECT max(s.data) FROM stato_storico s WHERE s.atto_id = c.atto_id), '-infinity'::date)
     ), storico_nuovo AS (
       INSERT INTO stato_storico (atto_id, stato, data, provenienza)
       SELECT atto_id, stato, data, 'agente'::provenienza FROM cambi_validi
-      ON CONFLICT (atto_id, stato, data) DO NOTHING
+      ON CONFLICT (atto_id, stato, data) WHERE provenienza = 'agente' DO NOTHING
       RETURNING atto_id, stato, data
     ), stato_aggiornato AS (
       UPDATE atto_normativo a
-      SET stato = u.stato, stato_confermato_il = now(), aggiornato_il = now()
+      SET stato = u.stato, stato_confermato_il = now()
       FROM (
         SELECT DISTINCT ON (atto_id) atto_id, stato FROM storico_nuovo ORDER BY atto_id, data DESC
       ) u
@@ -154,7 +151,7 @@ async function completaRicerca(
         a.criteri_soglie, a.criteri_testo, false, a.tutti_i_settori, false,
         'agente'::provenienza, r.fonte_id, now()
       FROM dati_atti a CROSS JOIN ricerca_bloccata r
-      ON CONFLICT (identificativo_ufficiale) DO NOTHING
+      ON CONFLICT DO NOTHING
       RETURNING id, identificativo_ufficiale
     ), temi_nuovi AS (
       INSERT INTO tema (nome)
@@ -221,6 +218,18 @@ async function completaRicerca(
     WHERE id IN (SELECT id FROM ricerca_bloccata)
     RETURNING notizie_create, atti_creati, (SELECT count(*) FROM stato_aggiornato) AS cambi_di_stato
   `);
+  const attiDaBloccare = [...new Set(cambi.map((c) => c.attoId))];
+  // In READ COMMITTED il lock deve essere un'istruzione separata: dopo un'attesa
+  // l'istruzione successiva legge anche lo storico appena salvato dall'altro writer.
+  const risultato = attiDaBloccare.length === 0
+    ? await completa
+    : (await db.batch([
+        db.execute(sql`
+          SELECT id FROM atto_normativo WHERE ${inArray(attoNormativo.id, attiDaBloccare)}
+          ORDER BY id FOR NO KEY UPDATE
+        `),
+        completa,
+      ]))[1];
   const [riga] = risultato.rows;
   return riga
     ? {
@@ -280,7 +289,11 @@ export const archivioRicerche: ArchivioEsecuzioni = {
     const righe = await db
       .update(esecuzioneRicerca)
       .set({ esito: "fallita", errore, terminataIl: sql`now()` })
-      .where(and(eq(esecuzioneRicerca.esito, "in_corso"), lt(esecuzioneRicerca.avviataIl, avviatePrima)))
+      .where(and(
+        eq(esecuzioneRicerca.esito, "in_corso"),
+        isNull(esecuzioneRicerca.parallelRunId),
+        lt(esecuzioneRicerca.avviataIl, avviatePrima),
+      ))
       .returning({ id: esecuzioneRicerca.id });
     return righe.length;
   },

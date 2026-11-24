@@ -11,13 +11,13 @@ export function PulsanteControllato({
   etichetta,
 }: {
   azione: (stato: StatoControllo, formData: FormData) => Promise<StatoControllo>;
-  id: number;
+  id?: number;
   etichetta: string;
 }) {
   const [stato, esegui, inCorso] = useActionState(azione, undefined);
   return (
     <form action={esegui} className="flex flex-col items-end gap-1">
-      <input type="hidden" name="id" value={id} />
+      {id !== undefined && <input type="hidden" name="id" value={id} />}
       <Button type="submit" variant="outline" size="sm" disabled={inCorso}>
         {inCorso ? "Salvo…" : etichetta}
       </Button>

@@ -167,6 +167,13 @@ test("elaboraWebhook: una Notizia non valida si scarta, le altre si salvano e la
   assert.equal(archivio.ricerche[0].esito, "completata");
 });
 
+test("elaboraWebhook: un elenco di sole Notizie invalide fallisce anche nello schema v3", async () => {
+  const { archivio, deps } = await ricercaAvviata({ notizie: [notiziaOutput({ url: "non-un-url" })] });
+  assert.equal((await elaboraWebhook(eventoCompletato("trun_1"), deps)).esito, "fallita");
+  assert.equal(archivio.ricerche[0].esito, "fallita");
+  assert.deepEqual(archivio.notizie, []);
+});
+
 test("elaboraWebhook: un risultato prodotto con un'altra versione dello schema non viene letto", async () => {
   const { archivio, deps } = await ricercaAvviata({ notizie: [notiziaOutput()] }, { ...METADATI_EUR_LEX, versione_schema: 0 });
 

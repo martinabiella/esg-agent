@@ -7,7 +7,7 @@ export type RigheAvviso = {
   // Atti con contenuti generati dall'agente non ancora confermati.
   attiDaConfermare: { attoId: number; titolo: string; aggiornatoIl: string }[];
   // Cambi di Stato rilevati dall'agente e non ancora visti.
-  cambiDiStato: { attoId: number; titolo: string; stato: string; data: string }[];
+  cambiDiStato: { id: number; attoId: number; titolo: string; stato: string; data: string }[];
   // Notizie che segnalano una novità, per ogni Atto collegato non ancora controllato.
   notizieSuAtti: { notiziaId: number; notiziaTitolo: string; notiziaCreataIl: string; attoId: number; attoTitolo: string }[];
   // Notizie che segnalano una novità senza Atti collegati, non ancora controllate.
@@ -18,7 +18,7 @@ export type VoceAtto = {
   attoId: number;
   titolo: string;
   contenutiGenerati: boolean;
-  cambiDiStato: { stato: string; data: string }[];
+  cambiDiStato: { id: number; stato: string; data: string }[];
   notizie: { id: number; titolo: string }[];
   // Data (AAAA-MM-GG) dell'ultimo fatto che ha messo l'Atto nell'Avviso.
   ultimoMovimento: string;
@@ -49,7 +49,7 @@ export function costruisciAvviso(righe: RigheAvviso): Avviso {
   }
   for (const c of righe.cambiDiStato) {
     const v = voce(c.attoId, c.titolo);
-    v.cambiDiStato.push({ stato: c.stato, data: c.data });
+    v.cambiDiStato.push({ id: c.id, stato: c.stato, data: c.data });
     movimento(v, c.data);
   }
   for (const n of righe.notizieSuAtti) {
