@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "./index";
 import { elencoClienti, type ClienteConSettori } from "./clienti";
 import {
@@ -7,6 +7,7 @@ import {
   type Applicabilita,
   type AttoPerCalcolo,
 } from "@/lib/applicabilita";
+import type { ImpattoClienti } from "@/lib/avviso-di-conferma";
 import {
   applicabilitaEffettiva,
   criteriModificatiDopo,
@@ -148,4 +149,39 @@ export async function normativePerCliente(
       }));
   }
   return risultato;
+}
+
+// Quanti Clienti tocca ciascun Atto (esito effettivo, Override compresi): serve
+// a ordinare l'Avviso di conferma. Gli Atti non calcolabili valgono zero.
+export async function impattoPerAtto(attoIds: readonly number[]): Promise<Map<number, ImpattoClienti>> {
+  const impatto = new Map<number, ImpattoClienti>();
+  if (attoIds.length === 0) return impatto;
+  const ids = [...attoIds];
+  const [clienti, atti, settoriAtti, override] = await Promise.all([
+    elencoClienti(),
+    db.select().from(attoNormativo).where(inArray(attoNormativo.id, ids)),
+    db.select().from(attoSettore).where(inArray(attoSettore.attoId, ids)),
+    db.select().from(overrideApplicabilita).where(inArray(overrideApplicabilita.attoId, ids)),
+  ]);
+  const settoriPerAtto = new Map<number, number[]>();
+  for (const s of settoriAtti) {
+    settoriPerAtto.set(s.attoId, [...(settoriPerAtto.get(s.attoId) ?? []), s.settoreId]);
+  }
+  const overridePerCoppia = new Map(override.map((o) => [`${o.clienteId}:${o.attoId}`, o]));
+
+  for (const a of atti) {
+    const conteggio: ImpattoClienti = { applicabili: 0, daVerificare: 0 };
+    impatto.set(a.id, conteggio);
+    if (!attoCalcolabile(a)) continue;
+    for (const cliente of clienti) {
+      const { effettiva } = valuta(
+        { ...a, settori: settoriPerAtto.get(a.id) ?? [] },
+        cliente,
+        overridePerCoppia.get(`${cliente.id}:${a.id}`),
+      );
+      if (effettiva === "applicabile") conteggio.applicabili++;
+      else if (effettiva === "da_verificare") conteggio.daVerificare++;
+    }
+  }
+  return impatto;
 }

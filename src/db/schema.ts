@@ -245,6 +245,9 @@ export const notizia = pgTable("notizia", {
   // Suggerisce modifiche a un Atto esistente o discute una nuova normativa.
   // Lo imposta solo l'agente.
   segnalaNovita: boolean("segnala_novita").notNull().default(false),
+  // Quando una persona l'ha segnata controllata (Avviso di conferma): vale per le
+  // Notizie senza Atti collegati; per le altre conta notizia_atto.controllata_il.
+  controllataIl: timestamp("controllata_il"),
   creatoIl: timestamp("creato_il").notNull().defaultNow(),
 });
 
@@ -257,6 +260,8 @@ export const notiziaAtto = pgTable(
     attoId: integer("atto_id")
       .notNull()
       .references(() => attoNormativo.id, { onDelete: "cascade" }),
+    // Quando una persona ha controllato l'Atto a proposito di questa Notizia: null = da controllare.
+    controllataIl: timestamp("controllata_il"),
   },
   (t) => [primaryKey({ columns: [t.notiziaId, t.attoId] })],
 );

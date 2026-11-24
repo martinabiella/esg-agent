@@ -1,4 +1,4 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "./index";
 import type { CampiNotizia } from "@/lib/notizia";
 import { attoNormativo, notizia, notiziaAtto } from "./schema";
@@ -130,7 +130,17 @@ export async function aggiornaNotizia(
         })
         .where(eq(notizia.id, id))
         .returning({ id: notizia.id }),
-      db.delete(notiziaAtto).where(eq(notiziaAtto.notiziaId, id)),
+      // Si tolgono solo i collegamenti non più richiesti: quelli rimasti conservano
+      // controllata_il, altrimenti modificare una Notizia rimetterebbe nell'Avviso
+      // di conferma Atti già controllati.
+      db
+        .delete(notiziaAtto)
+        .where(
+          and(
+            eq(notiziaAtto.notiziaId, id),
+            sql`${notiziaAtto.attoId} <> ALL(${elencoInteri(valori.atti)})`,
+          ),
+        ),
       db
         .insert(notiziaAtto)
         .select(
@@ -141,7 +151,8 @@ export async function aggiornaNotizia(
             })
             .from(notizia)
             .where(eq(notizia.id, id)),
-        ),
+        )
+        .onConflictDoNothing(),
     ]);
     return aggiornate.length > 0 ? { ok: true, id } : { ok: false, motivo: "non_trovata" };
   } catch (e) {

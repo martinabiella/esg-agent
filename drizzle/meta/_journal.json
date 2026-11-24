@@ -57,6 +57,13 @@
       "when": 1795448030835,
       "tag": "0007_cambi_di_stato_agente",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795520740867,
+      "tag": "0008_avviso_di_conferma",
+      "breakpoints": true
     }
   ]
 }

@@ -69,8 +69,12 @@ Le righe che l'agente scrive in testa al summary di un Atto che ha creato: da qu
 _Avoid_: Nota, warning
 
 **Avviso di conferma**:
-Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona, più i cambi di Stato rilevati dall'agente e le Notizie che segnalano una novità (modifiche a Atti esistenti o nuove normative, con la possibilità di creare l'Atto dalla Notizia). Una Notizia esce dall'avviso quando una persona la segna come controllata. Non blocca nulla.
+Messaggio mostrato all'apertura dell'app che elenca gli Atti i cui contenuti generati (Criteri di applicabilità, summary, Settori, Temi) attendono la conferma di una persona, più i cambi di Stato rilevati dall'agente e le Notizie che segnalano una novità (modifiche a Atti esistenti o nuove normative, con la possibilità di creare l'Atto dalla Notizia). Si conta per Atto: un Atto con più motivi (contenuti generati, cambio di Stato, Notizia collegata) è una sola voce, e le Notizie senza Atto collegato sono voci a sé. Le voci sono ordinate per impatto sui Clienti (prima gli Atti applicabili a più Clienti, poi quelli da verificare). Un Atto esce dall'avviso quando una persona lo segna **controllato**, una Notizia senza Atto quando la segna controllata o ne crea l'Atto. Non blocca nulla.
 _Avoid_: Notifica, coda di revisione, task
+
+**Controllato**:
+Un Atto segnato da una persona con un'unica azione per tutto l'Atto: tutti i contenuti generati passano a *confermato da una persona*, i cambi di Stato dell'agente diventano *visti* e le Notizie collegate che segnalano una novità diventano *controllate*. Non esiste una conferma parziale (per esempio solo i Criteri). L'Atto torna nell'Avviso di conferma solo quando l'agente registra qualcosa di nuovo (un altro cambio di Stato, un'altra Notizia che segnala una novità).
+_Avoid_: Approvato, validato, revisionato
 
 **Fonte**:
 Un sito o canale monitorato dall'agente, con un livello di affidabilità: ufficiale (fa fede per Stato e date) oppure editoriale (solo Notizie e scoperta). L'elenco è modificabile dagli utenti: l'agente non aggiunge Fonti da solo. L'*ultimo controllo* di una Fonte dipende dalla sua ultima Ricerca conclusa: *controllata* (completata), *non leggibile* (fallita), *saltata per tetto*, oppure *mai controllata* se non ci sono Ricerche dopo l'ultimo cambio di URL. Non è uno Stato. Non va confusa con chi ha pubblicato una Notizia (nell'app "Pubblicata da"), che è un testo libero.
