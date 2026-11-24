@@ -144,9 +144,9 @@ export async function creaFonte(valori: CampiFonte): Promise<EsitoScritturaFonte
   }
 }
 
-// Se l'URL cambia davvero (non solo maiuscole o barra finale), la Fonte riparte
-// da "mai controllata": le Ricerche avviate prima non contano più. Il cambio di
-// tipo vale dalla prossima Ricerca.
+// Se cambia l'URL salvato, la Fonte riparte da "mai controllata". La chiave di
+// unicità ignora maiuscole e barra finale, ma nel percorso possono contare.
+// Il cambio di tipo vale dalla prossima Ricerca.
 export async function aggiornaFonte(id: number, valori: CampiFonte): Promise<EsitoScritturaFonte> {
   try {
     const righe = await db
@@ -155,7 +155,7 @@ export async function aggiornaFonte(id: number, valori: CampiFonte): Promise<Esi
         nome: valori.nome,
         url: valori.url,
         tipo: valori.tipo,
-        urlModificatoIl: sql`CASE WHEN ${chiaveUrlFonte(fonte.url)} = ${chiaveUrl(valori.url)}
+        urlModificatoIl: sql`CASE WHEN ${fonte.url} = ${valori.url}
           THEN ${fonte.urlModificatoIl} ELSE now() END`,
       })
       .where(eq(fonte.id, id))

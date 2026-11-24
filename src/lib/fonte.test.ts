@@ -33,7 +33,17 @@ test("validaFonte: nome e URL obbligatori, e l'errore conserva quanto digitato",
 });
 
 test("validaFonte: l'URL deve essere http o https valido", () => {
-  for (const url of ["eur-lex.europa.eu", "ftp://eur-lex.europa.eu", "javascript:alert(1)", "https://", "https://eur lex.eu"]) {
+  for (const url of [
+    "eur-lex.europa.eu",
+    "ftp://eur-lex.europa.eu",
+    "javascript:alert(1)",
+    "https://",
+    "https://eur lex.eu",
+    "https:eur-lex.europa.eu",
+    "https:/eur-lex.europa.eu",
+    "https:///eur-lex.europa.eu",
+    "https://\\eur-lex.europa.eu",
+  ]) {
     const esito = validaFonte({ ...base, url });
     assert.equal(esito.ok, false, url);
     if (!esito.ok) {
@@ -41,6 +51,7 @@ test("validaFonte: l'URL deve essere http o https valido", () => {
     }
   }
   assert.equal(validaFonte({ ...base, url: "http://www.senato.it" }).ok, true);
+  assert.equal(validaFonte({ ...base, url: "HTTPS://eur-lex.europa.eu/Feed" }).ok, true);
 });
 
 test("validaFonte: il tipo è obbligatorio, ufficiale o editoriale", () => {
