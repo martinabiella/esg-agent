@@ -54,11 +54,22 @@ Variabili d'ambiente (in `.env.local`, mai nel repository):
 | `DATABASE_URL` | Connessione Postgres su Neon |
 | `NEON_AUTH_BASE_URL` | URL di Neon Auth del branch (pannello Neon → Auth → Configuration) |
 | `NEON_AUTH_COOKIE_SECRET` | Segreto per i cookie di sessione, almeno 32 caratteri: `openssl rand -base64 32` |
+| `PARALLEL_API_KEY` | API key di Parallel, per avviare le Ricerche e leggerne i risultati |
+| `PARALLEL_WEBHOOK_SECRET` | Segreto dei webhook di Parallel (`whsec_…`, in Parallel → Settings → Webhooks): verifica la firma del webhook |
+| `PARALLEL_WEBHOOK_URL` | Facoltativa. URL a cui Parallel manda il webhook; se manca, `https://<dominio di produzione Vercel>/api/parallel/webhook` |
 
-Per le scritture (azioni server e rotte API) usare `utenteRichiesto()` da `@/lib/auth`: restituisce l'utente corrente o lancia `NonAutenticatoError`.
+Per le scritture (azioni server e rotte API) usare `utenteRichiesto()` da `@/lib/auth`: restituisce l'utente corrente o lancia `NonAutenticatoError`. Unica eccezione è il webhook di Parallel (`/api/parallel/webhook`): non ha una sessione e si autentica con la firma di Parallel (vedi "Agente (Parallel)").
 
-Il proxy (`src/proxy.ts`) rimanda a `/auth/sign-in` chi non ha una sessione. Ogni scrittura verifica comunque la sessione lato server.
+Il proxy (`src/proxy.ts`) rimanda a `/auth/sign-in` chi non ha una sessione, tranne per il webhook di Parallel. Ogni scrittura verifica comunque la sessione (o la firma, per il webhook) lato server.
 
 Better Auth UI fornisce i moduli di accesso e reset password, la vista di uscita e il menu utente. I vecchi link `/accedi` e `/reimposta` funzionano ancora.
 
 I componenti del registro shadcn sono in `src/components/auth/`. Se li aggiorni, mantieni nascosti i link di registrazione. Allinea `better-auth` alla versione compatibile con `@neon/auth`.
+
+## Agente (Parallel)
+
+L'agente è una pipeline di Ricerche asincrone ([ADR 0002](docs/adr/0002-agente-come-pipeline-con-webhook.md)). `avviaRicercaPerFonte` (`src/lib/ricerca-fonte.ts`) avvia un task run sulla [Task API di Parallel](https://docs.parallel.ai/task-api/webhooks) e registra la Ricerca in `esecuzione_ricerca`. A fine run Parallel chiama `POST /api/parallel/webhook`. La rotta verifica la firma (Standard Webhooks, HMAC-SHA256), legge il risultato dalla Task API, lo valida con lo schema versionato in `src/lib/output-ricerca.ts` e salva le Notizie senza duplicati (URL normalizzato).
+
+La rotta del webhook è esclusa dal proxy: si autentica con la firma, non con la sessione. Una risposta diversa da 2xx fa riprovare Parallel per 48 ore, quindi un errore temporaneo (DB, rete) non perde il risultato.
+
+Il webhook non raggiunge `localhost`: in locale si prova con il client finto dei test (`npm test`).
