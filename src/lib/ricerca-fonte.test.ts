@@ -59,6 +59,8 @@ class ArchivioFinto implements ArchivioRicerche {
     const nuove = notizie.filter((n) => !this.notizie.some((e) => e.url === n.url));
     for (const n of nuove) this.notizie.push({ ...n, id: this.notizie.length + 1 });
     Object.assign(r, { esito: "completata", notizieCreate: nuove.length });
+    const ultima = this.ultimaRiuscita.get(r.fonteId);
+    if (!ultima || ultima < r.avviataIl) this.ultimaRiuscita.set(r.fonteId, r.avviataIl);
     return { notizieCreate: nuove.length };
   }
   async segnaFallita(id: number, errore: string) {
@@ -258,6 +260,35 @@ test("elaboraWebhook: una Notizia non valida si scarta, le altre si salvano e la
   assert.deepEqual(esito, { esito: "completata", notizieCreate: 1, notizieScartate: 1 });
   assert.deepEqual(archivio.notizie.map((n) => n.titolo), ["Omnibus: rinvio degli obblighi CSRD"]);
   assert.equal(archivio.ricerche[0].esito, "completata");
+});
+
+test("elaboraWebhook: se tutte le Notizie sono invalide la Ricerca fallisce e la finestra non cambia", async () => {
+  const { archivio, client, deps } = await ricercaAvviata({
+    notizie: [notiziaOutput({ url: "non-un-url" }), { titolo: "Senza gli altri campi" }],
+  });
+  archivio.ultimaRiuscita.set(EUR_LEX.id, new Date("2026-11-12T06:00:00Z"));
+
+  assert.equal((await elaboraWebhook(eventoCompletato("trun_1"), deps)).esito, "fallita");
+  assert.equal(archivio.ricerche[0].esito, "fallita");
+  assert.match(archivio.ricerche[0].errore ?? "", /Notizie non valide/);
+  assert.deepEqual(archivio.notizie, []);
+
+  await avviaRicercaPerFonte(EUR_LEX, deps);
+  assert.equal(client.richieste[1].source_policy.after_date, "2026-11-12");
+});
+
+test("elaboraWebhook: un elenco vuoto è una Ricerca riuscita senza Notizie", async () => {
+  const { archivio, client, deps } = await ricercaAvviata({ notizie: [] });
+
+  assert.deepEqual(await elaboraWebhook(eventoCompletato("trun_1"), deps), {
+    esito: "completata",
+    notizieCreate: 0,
+    notizieScartate: 0,
+  });
+  assert.equal(archivio.ricerche[0].esito, "completata");
+
+  await avviaRicercaPerFonte(EUR_LEX, deps);
+  assert.equal(client.richieste[1].source_policy.after_date, "2026-11-19");
 });
 
 test("elaboraWebhook: un risultato prodotto con un'altra versione dello schema non viene letto", async () => {
