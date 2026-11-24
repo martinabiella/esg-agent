@@ -241,8 +241,8 @@ test("avviaEsecuzione: un webhook oltre le 48 ore salva ancora il risultato di u
 
 // ---- Esito dell'ultima esecuzione (accanto al pulsante «Avvia ricerca ora») ----
 
-function ricerca(fonte: string | null, esito: EsitoRicerca, notizieCreate = 0) {
-  return { fonte, esito, notizieCreate };
+function ricerca(fonte: string | null, esito: EsitoRicerca, notizieCreate = 0, attiCreati = 0) {
+  return { fonte, esito, notizieCreate, attiCreati };
 }
 
 test("esitoEsecuzione: con Ricerche ancora in corso, quante sono concluse e quante saltate", () => {
@@ -268,11 +268,11 @@ test("esitoEsecuzione: tutte le Fonti controllate, con le Notizie nuove", () => 
   assert.deepEqual(esitoEsecuzione({ avviataIl: ORA, ricerche }, ORA), {
     stato: "completata",
     avviataIl: ORA,
-    descrizione: "2 Fonti controllate, 3 Notizie nuove.",
+    descrizione: "2 Fonti controllate, 3 Notizie nuove, 0 Atti nuovi.",
   });
   assert.equal(
     esitoEsecuzione({ avviataIl: ORA, ricerche: [ricerca("A", "completata", 1)] }, ORA).descrizione,
-    "1 Fonte controllata, 1 Notizia nuova.",
+    "1 Fonte controllata, 1 Notizia nuova, 0 Atti nuovi.",
   );
 });
 
@@ -287,7 +287,7 @@ test("esitoEsecuzione: le Fonti fallite sono non leggibili, anche se eliminate n
   assert.deepEqual(esitoEsecuzione({ avviataIl: ORA, ricerche }, ORA), {
     stato: "fonti_non_leggibili",
     avviataIl: ORA,
-    descrizione: "1 Fonte controllata, 1 Notizia nuova. Non leggibili: B, Fonte eliminata. 1 Fonte saltata per tetto.",
+    descrizione: "1 Fonte controllata, 1 Notizia nuova, 0 Atti nuovi. Non leggibili: B, Fonte eliminata. 1 Fonte saltata per tetto.",
   });
 });
 
@@ -298,7 +298,7 @@ test("esitoEsecuzione: dopo 2 ore una Ricerca ancora in corso è senza risposta 
   assert.deepEqual(esitoEsecuzione({ avviataIl, ricerche }, ORA), {
     stato: "fonti_non_leggibili",
     avviataIl,
-    descrizione: "1 Fonte controllata, 0 Notizie nuove. Senza risposta: B.",
+    descrizione: "1 Fonte controllata, 0 Notizie nuove, 0 Atti nuovi. Senza risposta: B.",
   });
 });
 
@@ -321,5 +321,17 @@ test("avviaEsecuzione: se il run partito su Parallel non si registra, la Ricerca
       [1, "fallita", "La Ricerca è partita su Parallel ma non è stato possibile registrarla: il risultato andrà perso."],
       [2, "in_corso", null],
     ],
+  );
+});
+
+test("esitoEsecuzione: gli Atti nuovi creati dalle Ricerche compaiono nell'esito, al singolare se è uno", () => {
+  const ricerche = [ricerca("A", "completata", 4, 2), ricerca("B", "completata", 1, 1)];
+  assert.equal(
+    esitoEsecuzione({ avviataIl: ORA, ricerche }, ORA).descrizione,
+    "2 Fonti controllate, 5 Notizie nuove, 3 Atti nuovi.",
+  );
+  assert.equal(
+    esitoEsecuzione({ avviataIl: ORA, ricerche: [ricerca("A", "completata", 1, 1)] }, ORA).descrizione,
+    "1 Fonte controllata, 1 Notizia nuova, 1 Atto nuovo.",
   );
 });

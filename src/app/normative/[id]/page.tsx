@@ -1,6 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { Bot, TriangleAlert } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { separaAvvisoAgente } from "@/lib/avviso-agente";
 import { Button } from "@/components/ui/button";
 import { Caricamento } from "@/app/caricamento";
 import { attoDaParams } from "../trova-da-params";
@@ -52,6 +55,7 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
   const soglie = righeSoglie(atto.criteriSoglie);
   const haCriteri = soglie.length > 0 || atto.criteriTesto !== "";
   const provenienza = etichettaProvenienza[atto.provenienzaContenuti];
+  const { avviso, testo } = separaAvvisoAgente(atto.summary);
 
   return (
     <>
@@ -88,7 +92,37 @@ async function Scheda({ params }: { params: Promise<{ id: string }> }) {
       )}
 
       <Sezione titolo="Riepilogo">
-        {atto.summary ? <p className="max-w-3xl whitespace-pre-line">{atto.summary}</p> : vuoto("Nessun riepilogo.")}
+        {avviso && (
+          <div className="mb-3 flex max-w-3xl flex-col gap-2">
+            {avviso.daNotizia && (
+              <Alert>
+                <Bot />
+                <AlertTitle>Dati ricavati dall&apos;agente</AlertTitle>
+                <AlertDescription>
+                  Presi da{" "}
+                  <a href={avviso.daNotizia} target="_blank" rel="noreferrer">
+                    questo articolo
+                  </a>
+                  : controllali prima di fidarti.
+                </AlertDescription>
+              </Alert>
+            )}
+            {avviso.discrepanze.length > 0 && (
+              <Alert variant="destructive">
+                <TriangleAlert />
+                <AlertTitle>Gli articoli trovati non concordano</AlertTitle>
+                <AlertDescription>
+                  <ul className="list-disc pl-4">
+                    {avviso.discrepanze.map((d) => (
+                      <li key={d}>{d}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
+        {testo ? <p className="max-w-3xl whitespace-pre-line">{testo}</p> : vuoto("Nessun riepilogo.")}
       </Sezione>
 
       <Sezione titolo="Criteri di applicabilità">

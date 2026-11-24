@@ -29,6 +29,8 @@ test("validaOutputRicerca: un output valido diventa l'elenco delle Notizie trova
       },
     ],
     scartate: [],
+    candidati: [],
+    candidatiScartati: [],
   });
 });
 
@@ -36,7 +38,7 @@ test("validaOutputRicerca: senza l'elenco delle Notizie l'output non è valido, 
   for (const contenuto of [null, "testo", { notizie: "x" }, {}]) {
     const esito = validaOutputRicerca(contenuto, ORA);
     assert.equal(esito.ok, false, JSON.stringify(contenuto));
-    if (!esito.ok) assert.match(esito.errore, /^Il risultato di Parallel non rispetta lo schema \(v1\): /);
+    if (!esito.ok) assert.match(esito.errore, /^Il risultato di Parallel non rispetta lo schema \(v2\):/);
   }
 });
 
@@ -131,4 +133,73 @@ test("validaOutputRicerca: data o editore vuoti valgono come assenti", () => {
   assert.ok(esito.ok);
   assert.equal(esito.notizie[0].data, null);
   assert.equal(esito.notizie[0].pubblicataDa, null);
+});
+
+const candidatoValido = {
+  identificativo_ufficiale: " 32022L2464 ",
+  titolo: " Direttiva CSRD ",
+  giurisdizione: "ue",
+  tipo: "direttiva",
+  stato: "in_vigore",
+  url_testo: " https://eur-lex.europa.eu/eli/dir/2022/2464/oj ",
+  summary: " Estende la rendicontazione di sostenibilità. ",
+  criteri_testo: " Grandi imprese. ",
+  soglie: [{ campo: "dipendenti", minimo: "250", massimo: null, paesi: [] }],
+  tutti_i_settori: false,
+  settori: ["Energia", " "],
+  temi: [" Rendicontazione "],
+  da_notizia: "https://www.esempio.it/omnibus?utm_source=nl",
+  discrepanze: [" Stato: «proposta» secondo un altro articolo. ", ""],
+};
+
+test("validaOutputRicerca: un candidato Atto valido arriva ripulito accanto alle Notizie", () => {
+  const esito = validaOutputRicerca({ notizie: [notiziaValida], atti_candidati: [candidatoValido] }, ORA);
+  assert.ok(esito.ok);
+  assert.deepEqual(esito.candidati, [
+    {
+      identificativoUfficiale: "32022L2464",
+      titolo: "Direttiva CSRD",
+      giurisdizione: "ue",
+      tipo: "direttiva",
+      stato: "in_vigore",
+      urlTesto: "https://eur-lex.europa.eu/eli/dir/2022/2464/oj",
+      summary: "Estende la rendicontazione di sostenibilità.",
+      criteriTesto: "Grandi imprese.",
+      soglie: [{ campo: "dipendenti", minimo: "250", massimo: "", paesi: [] }],
+      tuttiISettori: false,
+      settori: ["Energia"],
+      temi: ["Rendicontazione"],
+      daNotizia: "https://www.esempio.it/omnibus",
+      discrepanze: ["Stato: «proposta» secondo un altro articolo."],
+    },
+  ]);
+  assert.equal(esito.notizie.length, 1);
+});
+
+test("validaOutputRicerca: un candidato con struttura sbagliata si scarta da solo, Notizie e altri candidati restano", () => {
+  const altro = { ...candidatoValido, identificativo_ufficiale: "32024R1689", titolo: "AI Act" };
+  const esito = validaOutputRicerca(
+    { notizie: [notiziaValida], atti_candidati: [{ ...candidatoValido, tipo: "ordinanza" }, altro] },
+    ORA,
+  );
+  assert.ok(esito.ok);
+  assert.equal(esito.notizie.length, 1);
+  assert.deepEqual(esito.candidati.map((c) => c.titolo), ["AI Act"]);
+  assert.equal(esito.candidatiScartati.length, 1);
+  assert.equal(esito.candidatiScartati[0].posizione, 1);
+  assert.match(esito.candidatiScartati[0].motivo, /^atti_candidati\.1\.tipo: /);
+});
+
+test("validaOutputRicerca: senza atti_candidati l'output vale come senza candidati", () => {
+  const esito = validaOutputRicerca({ notizie: [notiziaValida] }, ORA);
+  assert.ok(esito.ok);
+  assert.deepEqual(esito.candidati, []);
+});
+
+test("schemaOutputParallel: chiede i candidati Atto con i campi validati da validaOutputRicerca", () => {
+  const schema = schemaOutputParallel() as { properties: { atti_candidati: { items: { properties: Nodo } } } };
+  assert.deepEqual(Object.keys(schema.properties.atti_candidati.items.properties).sort(), [
+    "criteri_testo", "da_notizia", "discrepanze", "giurisdizione", "identificativo_ufficiale",
+    "settori", "soglie", "stato", "summary", "temi", "tipo", "titolo", "tutti_i_settori", "url_testo",
+  ]);
 });
