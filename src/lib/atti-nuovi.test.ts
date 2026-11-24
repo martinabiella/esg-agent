@@ -173,13 +173,13 @@ test("se il primo candidato con un identificativo non è valido, il secondo con 
 });
 
 test("un candidato valido senza Settori del catalogo diventa un Atto senza Settori", () => {
-  const senzaSettori = { ...candidato, settori: ["Settore inventato"] };
-  const esito = decidiAttiNuovi([senzaSettori], [], settori, ORA);
-  assert.deepEqual(esito.daCreare.map((a) => a.settori), [[]]);
-  assert.deepEqual(esito.scartati, []);
-
-  const perTutti = decidiAttiNuovi([{ ...senzaSettori, tuttiISettori: true }], [], settori, ORA);
-  assert.equal(perTutti.daCreare.length, 1);
+  for (const nomi of [[], ["Settore inventato"]]) {
+    const { daCreare, scartati } = decidiAttiNuovi([{ ...candidato, settori: nomi }], [], settori, ORA);
+    assert.deepEqual(scartati, []);
+    assert.deepEqual(daCreare.map((a) => ({ settori: a.settori, tuttiISettori: a.tuttiISettori })), [
+      { settori: [], tuttiISettori: false },
+    ]);
+  }
 });
 
 test("oltre 20 candidati validi per Ricerca si creano i primi 20, gli altri si scartano con il motivo", () => {
