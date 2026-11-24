@@ -64,6 +64,13 @@
       "when": 1795561177171,
       "tag": "0008_storico_agente",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795561220420,
+      "tag": "0009_avviso_di_conferma",
+      "breakpoints": true
     }
   ]
 }
