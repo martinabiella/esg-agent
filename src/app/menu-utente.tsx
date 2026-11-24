@@ -9,6 +9,7 @@ const voci = [
   { href: "/settori", label: "Settori" },
   { href: "/clienti", label: "Clienti" },
   { href: "/notizie", label: "Notizie" },
+  { href: "/fonti", label: "Fonti" },
 ];
 
 export async function MenuUtente() {

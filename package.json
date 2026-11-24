@@ -12,6 +12,7 @@
     "db:seed": "tsx src/db/seed-settori.ts",
     "db:seed-atti": "tsx src/db/seed-atti.ts",
     "db:seed-clienti": "tsx src/db/seed-clienti.ts",
+    "db:seed-fonti": "tsx src/db/seed-fonti.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test src/lib/*.test.ts"
   },

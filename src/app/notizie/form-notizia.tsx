@@ -93,7 +93,7 @@ export function FormNotizia({
             aria-describedby={descritto("titolo")}
           />
         </Campo>
-        <Campo nome="fonte" etichetta="Fonte *" errori={errori}>
+        <Campo nome="fonte" etichetta="Pubblicata da *" errori={errori}>
           <Input
             key={`fo-${valori.fonte}`}
             id="fonte"

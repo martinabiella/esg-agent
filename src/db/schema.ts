@@ -14,8 +14,9 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import { type AnyColumn, type SQL, sql } from "drizzle-orm";
 import { TIPI_ATTO } from "../lib/tipi-atto";
+import { TIPI_FONTE } from "../lib/fonte";
 
 // Vocabolario: vedi GLOSSARY.md
 
@@ -67,20 +68,33 @@ export const tema = pgTable(
 );
 
 // ufficiale: fa fede per Stato e date. editoriale: solo Notizie e scoperta.
-export const tipoFonte = pgEnum("tipo_fonte", ["ufficiale", "editoriale"]);
+export const tipoFonte = pgEnum("tipo_fonte", TIPI_FONTE);
+
+// URL e nome della Fonte per l'unicità: devono restare identiche a chiaveUrl e
+// chiaveNome in src/lib/fonte.ts.
+export const chiaveUrlFonte = (url: AnyColumn | SQL) => sql<string>`lower(rtrim(${url}, '/'))`;
+export const chiaveNomeFonte = (nome: AnyColumn | SQL) => sql<string>`lower(${nome})`;
 
 // Siti monitorati dall'agente. L'elenco lo gestiscono gli utenti: l'agente
 // non aggiunge Fonti da solo.
-export const fonte = pgTable("fonte", {
-  id: serial("id").primaryKey(),
-  nome: text("nome").notNull(),
-  url: text("url").notNull().unique(),
-  tipo: tipoFonte("tipo").notNull(),
-  // Quando cambia l'URL la Fonte riparte da "mai controllata": contano solo
-  // le Ricerche avviate dopo questa data.
-  urlModificatoIl: timestamp("url_modificato_il").notNull().defaultNow(),
-  creatoIl: timestamp("creato_il").notNull().defaultNow(),
-});
+export const fonte = pgTable(
+  "fonte",
+  {
+    id: serial("id").primaryKey(),
+    nome: text("nome").notNull(),
+    url: text("url").notNull(),
+    tipo: tipoFonte("tipo").notNull(),
+    // Quando cambia l'URL la Fonte riparte da "mai controllata": contano solo
+    // le Ricerche avviate dopo questa data.
+    urlModificatoIl: timestamp("url_modificato_il").notNull().defaultNow(),
+    creatoIl: timestamp("creato_il").notNull().defaultNow(),
+  },
+  // URL e nome unici senza distinguere maiuscole (e, per l'URL, la barra finale).
+  (t) => [
+    uniqueIndex("fonte_url_chiave_idx").on(chiaveUrlFonte(t.url)),
+    uniqueIndex("fonte_nome_lower_idx").on(chiaveNomeFonte(t.nome)),
+  ],
+);
 
 export const attoNormativo = pgTable("atto_normativo", {
   id: serial("id").primaryKey(),
@@ -211,6 +225,8 @@ export const overrideApplicabilita = pgTable(
 export const notizia = pgTable("notizia", {
   id: serial("id").primaryKey(),
   titolo: text("titolo").notNull(),
+  // Chi ha pubblicato l'articolo ("Pubblicata da"), testo libero: non è una
+  // Fonte monitorata dall'agente.
   fonte: text("fonte").notNull(),
   data: date("data"),
   url: text("url").notNull().unique(),

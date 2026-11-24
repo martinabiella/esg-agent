@@ -84,7 +84,7 @@ function DettaglioNotizia({ notizia }: { notizia: NotiziaConAtti }) {
   return (
     <div className="flex-1 overflow-y-auto p-4">
       <dl className="grid gap-4">
-        <Dato label="Fonte">{notizia.fonte}</Dato>
+        <Dato label="Pubblicata da">{notizia.fonte}</Dato>
         <Dato label="Data">{dataIt(notizia.data)}</Dato>
         <Dato label="URL">
           <a
@@ -216,7 +216,7 @@ export function TabellaNotizie({
           <TableHeader>
             <TableRow>
               <TableHead>Titolo</TableHead>
-              <TableHead>Fonte</TableHead>
+              <TableHead>Pubblicata da</TableHead>
               <TableHead>Data</TableHead>
             </TableRow>
           </TableHeader>
