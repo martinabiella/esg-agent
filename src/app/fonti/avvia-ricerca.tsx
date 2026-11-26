@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,9 @@ import { Spinner } from "@/components/ui/spinner";
 import type { EsitoEsecuzione } from "@/lib/esecuzione";
 import { etichettaEsitoEsecuzione } from "@/lib/etichette";
 import { type StatoAvvio, avviaEsecuzioneAzione } from "./azioni";
+
+// Ogni quanto la pagina si ricarica da sola finché l'Esecuzione è in corso.
+const INTERVALLO_AGGIORNAMENTO_MS = 10_000;
 
 // Fuso fisso: server e browser producono la stessa stringa.
 const formatoDataOra = new Intl.DateTimeFormat("it-IT", {
@@ -33,7 +37,7 @@ function messaggio(stato: NonNullable<StatoAvvio>): { testo: string; errore: boo
         testo:
           stato.fallite > 0
             ? "Esecuzione avviata, ma alcune Ricerche non sono partite: vedi l'ultimo controllo delle Fonti."
-            : "Esecuzione avviata: i risultati arrivano in pochi minuti. Ricarica la pagina per l'esito.",
+            : "Esecuzione avviata: i risultati arrivano in pochi minuti e l'esito si aggiorna da solo.",
         errore: false,
       };
     case "gia_in_corso":
@@ -53,6 +57,16 @@ function messaggio(stato: NonNullable<StatoAvvio>): { testo: string; errore: boo
 export function AvviaRicerca({ ultima }: { ultima: EsitoEsecuzione | null }) {
   const [stato, avvia, inAvvio] = useActionState(avviaEsecuzioneAzione, undefined);
   const avviso = stato && messaggio(stato);
+  const router = useRouter();
+  const inCorso = ultima?.stato === "in_corso";
+
+  // L'esito arriva dal webhook, fuori dalla pagina: finché è in corso la
+  // ricarico io, e mi fermo appena l'Esecuzione si chiude.
+  useEffect(() => {
+    if (!inCorso) return;
+    const timer = setInterval(() => router.refresh(), INTERVALLO_AGGIORNAMENTO_MS);
+    return () => clearInterval(timer);
+  }, [inCorso, router]);
 
   return (
     <Card className="mt-4">
