@@ -45,6 +45,7 @@ export async function AvvisoDiConferma() {
                   </Link>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {atto.contenutiGenerati && <Badge variant="secondary">Contenuti generati da confermare</Badge>}
+                    {atto.senzaSettori && <Badge variant="outline">Settori da assegnare</Badge>}
                     {atto.cambiDiStato.map((c) => (
                       <Badge key={c.id} variant="outline">
                         Stato: {etichettaStato[c.stato as keyof typeof etichettaStato] ?? c.stato} ({c.data})

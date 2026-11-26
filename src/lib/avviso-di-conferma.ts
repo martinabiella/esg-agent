@@ -5,7 +5,7 @@
 
 export type RigheAvviso = {
   // Atti con contenuti generati dall'agente non ancora confermati.
-  attiDaConfermare: { attoId: number; titolo: string; aggiornatoIl: string }[];
+  attiDaConfermare: { attoId: number; titolo: string; aggiornatoIl: string; senzaSettori: boolean }[];
   // Cambi di Stato rilevati dall'agente e non ancora visti.
   cambiDiStato: { id: number; attoId: number; titolo: string; stato: string; data: string }[];
   // Notizie che segnalano una novità, per ogni Atto collegato non ancora controllato.
@@ -18,6 +18,8 @@ export type VoceAtto = {
   attoId: number;
   titolo: string;
   contenutiGenerati: boolean;
+  // Nessun Settore e non «tutti i Settori»: non compare in nessuna scheda Settore.
+  senzaSettori: boolean;
   cambiDiStato: { id: number; stato: string; data: string }[];
   notizie: { id: number; titolo: string }[];
   // Data (AAAA-MM-GG) dell'ultimo fatto che ha messo l'Atto nell'Avviso.
@@ -33,7 +35,7 @@ export function costruisciAvviso(righe: RigheAvviso): Avviso {
   const voce = (attoId: number, titolo: string): VoceAtto => {
     let v = perAtto.get(attoId);
     if (!v) {
-      v = { attoId, titolo, contenutiGenerati: false, cambiDiStato: [], notizie: [], ultimoMovimento: "" };
+      v = { attoId, titolo, contenutiGenerati: false, senzaSettori: false, cambiDiStato: [], notizie: [], ultimoMovimento: "" };
       perAtto.set(attoId, v);
     }
     return v;
@@ -45,6 +47,7 @@ export function costruisciAvviso(righe: RigheAvviso): Avviso {
   for (const a of righe.attiDaConfermare) {
     const v = voce(a.attoId, a.titolo);
     v.contenutiGenerati = true;
+    v.senzaSettori = a.senzaSettori;
     movimento(v, a.aggiornatoIl.slice(0, 10));
   }
   for (const c of righe.cambiDiStato) {
