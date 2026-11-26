@@ -97,7 +97,6 @@ test("chiaveIdentificativo ignora i prefissi italiani (D.L., D.Lgs., L., D.P.R.)
   assert.equal(chiaveIdentificativo("D.L. 177/2026"), chiaveIdentificativo("177/2026"));
   assert.equal(chiaveIdentificativo("DL 177/2026"), chiaveIdentificativo("d.l. 177/2026"));
   assert.equal(chiaveIdentificativo("D.Lgs. 125/2024"), chiaveIdentificativo("125/2024"));
-  assert.equal(chiaveIdentificativo("D.P.R. 1/2020"), chiaveIdentificativo("1/2020"));
   assert.equal(chiaveIdentificativo("L. 10/2020"), chiaveIdentificativo("10/2020"));
   assert.equal(chiaveIdentificativo("COM(2026) 590 definitivo"), chiaveIdentificativo("COM(2026) 590 final"));
   assert.equal(chiaveIdentificativo("COM(2026) 590 def."), chiaveIdentificativo("COM(2026) 590"));
@@ -122,4 +121,30 @@ test("trovaAttoCitato riconosce lo stesso decreto-legge e la stessa proposta con
     trovaAttoCitato({ identificativoUfficiale: "COM(2026) 590 definitivo", titolo: "Altro", giurisdizione: "ue" }, atti),
     { esito: "collegato", attoId: 81 },
   );
+});
+
+test("trovaAttoCitato: la grafia identica a un Atto del catalogo vince anche se un altro ha la stessa chiave allargata", () => {
+  const atti: AttoCatalogo[] = [
+    { id: 1, titolo: "Uno", identificativoUfficiale: "D.L. 177/2026", giurisdizione: "italia", nonRilevante: false },
+    { id: 2, titolo: "Due", identificativoUfficiale: "177/2026", giurisdizione: "italia", nonRilevante: false },
+  ];
+  assert.deepEqual(
+    trovaAttoCitato({ identificativoUfficiale: "D.L. 177/2026", titolo: "x", giurisdizione: "italia" }, atti),
+    { esito: "collegato", attoId: 1 },
+  );
+  assert.deepEqual(
+    trovaAttoCitato({ identificativoUfficiale: "d.l.177/2026", titolo: "x", giurisdizione: "italia" }, atti),
+    { esito: "collegato", attoId: 1 },
+  );
+  // Nessuna grafia identica: due Atti possibili, nel dubbio nessun collegamento.
+  assert.deepEqual(
+    trovaAttoCitato({ identificativoUfficiale: "DL 177/2026", titolo: "x", giurisdizione: "italia" }, atti),
+    { esito: "ambiguo" },
+  );
+});
+
+test("chiaveIdentificativo: il D.P.R. ha una numerazione sua e non si unisce a leggi e decreti; «n.» dopo il prefisso si ignora", () => {
+  assert.notEqual(chiaveIdentificativo("D.P.R. 445/2000"), chiaveIdentificativo("L. 445/2000"));
+  assert.equal(chiaveIdentificativo("D.Lgs. n. 125/2024"), chiaveIdentificativo("125/2024"));
+  assert.equal(chiaveIdentificativo("Legge n. 10/2020"), chiaveIdentificativo("10/2020"));
 });
