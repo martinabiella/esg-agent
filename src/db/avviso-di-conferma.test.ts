@@ -36,3 +36,24 @@ test("segnaAttoControllato: le novità arrivate dopo l'apertura dell'avviso rest
     SELECT criteri_confermati, provenienza_contenuti FROM atto_normativo WHERE id = 1
   `)).rows, [{ criteri_confermati: true, provenienza_contenuti: "persona" }]);
 });
+
+test("avvisoDiConferma: segna senza Settori solo l'Atto dell'agente senza Settori e non «per tutti i Settori»", async (t) => {
+  const postgres = await postgresDiProva(t);
+  const { queryAttiDaConfermare } = await import("./avviso-di-conferma");
+  const { db } = await import("./index");
+  await postgres.exec(`
+    INSERT INTO settore (id, nome, descrizione) VALUES (1, 'Energia', 'Attività energetiche');
+    INSERT INTO atto_normativo (id, titolo, giurisdizione, tipo, stato, provenienza_contenuti, criteri_confermati, tutti_i_settori)
+    VALUES (1, 'Senza Settori', 'ue', 'direttiva', 'in_vigore', 'agente', false, false),
+           (2, 'Con un Settore', 'ue', 'direttiva', 'in_vigore', 'agente', false, false),
+           (3, 'Per tutti i Settori', 'ue', 'direttiva', 'in_vigore', 'agente', false, true);
+    INSERT INTO atto_settore (atto_id, settore_id) VALUES (2, 1);
+  `);
+
+  const [righe] = await db.batch([queryAttiDaConfermare()]);
+
+  assert.deepEqual(
+    righe.map((r) => { const { id, senza_settori } = r as unknown as { id: number; senza_settori: boolean }; return [id, senza_settori]; }).sort(([a], [b]) => Number(a) - Number(b)),
+    [[1, true], [2, false], [3, false]],
+  );
+});

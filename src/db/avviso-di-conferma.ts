@@ -11,24 +11,30 @@ import {
   type RigheAvviso,
 } from "@/lib/avviso-di-conferma";
 
+// Atti con contenuti dell'agente non confermati. Esportata perché i test la
+// eseguono su Postgres in memoria tramite db.batch.
+export function queryAttiDaConfermare() {
+  return db
+    .select({
+      attoId: attoNormativo.id,
+      titolo: attoNormativo.titolo,
+      aggiornatoIl: attoNormativo.aggiornatoIl,
+      senzaSettori: sql<boolean>`NOT ${attoNormativo.tuttiISettori} AND NOT EXISTS (SELECT 1 FROM ${attoSettore} WHERE ${attoSettore.attoId} = ${attoNormativo.id})`.as("senza_settori"),
+    })
+    .from(attoNormativo)
+    .where(
+      and(
+        eq(attoNormativo.provenienzaContenuti, "agente"),
+        eq(attoNormativo.criteriConfermati, false),
+        eq(attoNormativo.nonRilevante, false),
+      ),
+    );
+}
+
 async function righeAvviso(): Promise<RigheAvviso> {
   const recenti = limiteNotizieAvviso(new Date());
   const [attiDaConfermare, cambi, notizieSuAtti, notizieSenzaAtto] = await Promise.all([
-    db
-      .select({
-        attoId: attoNormativo.id,
-        titolo: attoNormativo.titolo,
-        aggiornatoIl: attoNormativo.aggiornatoIl,
-        senzaSettori: sql<boolean>`NOT ${attoNormativo.tuttiISettori} AND NOT EXISTS (SELECT 1 FROM ${attoSettore} WHERE ${attoSettore.attoId} = ${attoNormativo.id})`,
-      })
-      .from(attoNormativo)
-      .where(
-        and(
-          eq(attoNormativo.provenienzaContenuti, "agente"),
-          eq(attoNormativo.criteriConfermati, false),
-          eq(attoNormativo.nonRilevante, false),
-        ),
-      ),
+    queryAttiDaConfermare(),
     cambiDiStatoNonVisti(),
     // Una Notizia che cita solo Atti Non rilevanti non compare in nessuno dei due elenchi.
     db
