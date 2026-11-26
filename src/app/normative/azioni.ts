@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { utenteRichiesto } from "@/lib/auth";
 import { NonAutenticatoError } from "@/lib/utente-richiesto";
 import { aggiornaAtto, creaAtto, eliminaAtto, giurisdizioniAtti, trovaAtto } from "@/db/atti";
+import { trovaNotizia } from "@/db/notizie";
+import { puoCreareAttoDaNotizia } from "@/lib/atto-da-notizia";
 import {
   type ErroriAtto,
   type EsitoAtto,
@@ -108,9 +110,12 @@ async function validaCollegamenti(
   return validaRelazioni(esito.valori.relazioni, id, esito.valori.giurisdizione, destinazioni);
 }
 
-function erroreScrittura(motivo: "identificativo_duplicato" | "collegamento_inesistente" | "non_trovato", duplicatoId?: number | null) {
+function erroreScrittura(motivo: "identificativo_duplicato" | "collegamento_inesistente" | "non_trovato" | "notizia_gia_collegata", duplicatoId?: number | null) {
   if (motivo === "identificativo_duplicato") {
     return { campo: "identificativoUfficiale" as const, messaggio: "Esiste già un Atto con questo identificativo ufficiale.", duplicatoId: duplicatoId ?? undefined };
+  }
+  if (motivo === "notizia_gia_collegata") {
+    return { campo: "generale" as const, messaggio: "La Notizia è già collegata a un Atto: apri la home per vedere l'Avviso aggiornato." };
   }
   if (motivo === "collegamento_inesistente") {
     return { campo: "relazioni" as const, messaggio: "Un Settore, Tema o Atto collegato non esiste più: aggiorna la pagina." };
@@ -124,21 +129,43 @@ function conErrore(valori: ValoriModuloAtto, campo: string, messaggio: string, d
 }
 
 export async function creaAttoAzione(_stato: StatoModuloAtto, formData: FormData): Promise<StatoModuloAtto> {
+  return creaAttoConNotizia(null, formData);
+}
+
+// Crea l'Atto dal form precompilato da una Notizia (Avviso di conferma) e collega la Notizia.
+// Il primo argomento si fissa con bind nella pagina.
+export async function creaAttoDaNotiziaAzione(
+  notiziaId: number,
+  _stato: StatoModuloAtto,
+  formData: FormData,
+): Promise<StatoModuloAtto> {
+  return creaAttoConNotizia(notiziaId, formData);
+}
+
+async function creaAttoConNotizia(notiziaId: number | null, formData: FormData): Promise<StatoModuloAtto> {
   const valoriInput = validaModulo(formData);
   const raw = leggiInput(formData);
   const sessioneMancante = await sessione();
   if (sessioneMancante) return { errore: sessioneMancante, valori: moduloDaEsito(raw, valoriInput) };
   if (!valoriInput.ok) return { errori: valoriInput.errori, valori: valoriInput.valori };
 
+  if (notiziaId !== null) {
+    const notizia = await trovaNotizia(notiziaId);
+    if (!notizia || !puoCreareAttoDaNotizia(notizia)) {
+      return { errore: "La Notizia non è più in attesa di un Atto: torna alla home.", valori: valoriDaInput(raw, valoriInput) };
+    }
+  }
   const erroreRelazione = await validaCollegamenti(null, valoriInput);
   if (erroreRelazione) return conErrore(valoriDaInput(raw, valoriInput), "relazioni", erroreRelazione);
-  const scrittura = await creaAtto(valoriInput.valori);
+  const scrittura = await creaAtto(valoriInput.valori, notiziaId);
   if (!scrittura.ok) {
     const errore = erroreScrittura(scrittura.motivo, scrittura.motivo === "identificativo_duplicato" ? scrittura.duplicatoId : undefined);
     return conErrore(valoriDaInput(raw, valoriInput), errore.campo, errore.messaggio, errore.duplicatoId);
   }
   revalidatePath("/normative");
   revalidatePath(`/normative/${scrittura.id}`);
+  // L'Avviso sta in home e la Notizia compare anche in /notizie.
+  if (notiziaId !== null) revalidatePath("/", "layout");
   return { salvato: { id: scrittura.id, esito: "creato" } };
 }
 
