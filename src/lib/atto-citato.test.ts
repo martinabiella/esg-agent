@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { type AttoCatalogo, trovaAttoCitato } from "./atto-citato";
+import { type AttoCatalogo, chiaveIdentificativo, trovaAttoCitato } from "./atto-citato";
 
 const CSRD: AttoCatalogo = {
   id: 1,
@@ -90,5 +90,36 @@ test("trovaAttoCitato: titolo vuoto o di sola punteggiatura non riconosce nulla"
   assert.deepEqual(
     trovaAttoCitato({ identificativoUfficiale: null, titolo: " – ", giurisdizione: "ue" }, [vuoto]),
     { esito: "assente" },
+  );
+});
+
+test("chiaveIdentificativo ignora i prefissi italiani (D.L., D.Lgs., L., D.P.R.) e le varianti final/definitivo", () => {
+  assert.equal(chiaveIdentificativo("D.L. 177/2026"), chiaveIdentificativo("177/2026"));
+  assert.equal(chiaveIdentificativo("DL 177/2026"), chiaveIdentificativo("d.l. 177/2026"));
+  assert.equal(chiaveIdentificativo("D.Lgs. 125/2024"), chiaveIdentificativo("125/2024"));
+  assert.equal(chiaveIdentificativo("D.P.R. 1/2020"), chiaveIdentificativo("1/2020"));
+  assert.equal(chiaveIdentificativo("L. 10/2020"), chiaveIdentificativo("10/2020"));
+  assert.equal(chiaveIdentificativo("COM(2026) 590 definitivo"), chiaveIdentificativo("COM(2026) 590 final"));
+  assert.equal(chiaveIdentificativo("COM(2026) 590 def."), chiaveIdentificativo("COM(2026) 590"));
+});
+
+test("chiaveIdentificativo tiene distinti Atti diversi: Camera e Senato, Direttiva e Regolamento UE", () => {
+  assert.notEqual(chiaveIdentificativo("A.C. 3133/2026"), chiaveIdentificativo("A.S. 3133/2026"));
+  assert.notEqual(chiaveIdentificativo("A.C. 3133/2026"), chiaveIdentificativo("3133/2026"));
+  assert.notEqual(chiaveIdentificativo("Direttiva (UE) 2022/2464"), chiaveIdentificativo("Regolamento (UE) 2022/2464"));
+});
+
+test("trovaAttoCitato riconosce lo stesso decreto-legge e la stessa proposta con identificativi scritti diversi", () => {
+  const atti: AttoCatalogo[] = [
+    { id: 71, titolo: "DL 177", identificativoUfficiale: "177/2026", giurisdizione: "italia", nonRilevante: false },
+    { id: 81, titolo: "Proposta", identificativoUfficiale: "COM(2026) 590 final", giurisdizione: "ue", nonRilevante: false },
+  ];
+  assert.deepEqual(
+    trovaAttoCitato({ identificativoUfficiale: "D.L. 177/2026", titolo: "Altro titolo", giurisdizione: "italia" }, atti),
+    { esito: "collegato", attoId: 71 },
+  );
+  assert.deepEqual(
+    trovaAttoCitato({ identificativoUfficiale: "COM(2026) 590 definitivo", titolo: "Altro", giurisdizione: "ue" }, atti),
+    { esito: "collegato", attoId: 81 },
   );
 });

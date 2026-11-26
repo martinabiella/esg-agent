@@ -29,8 +29,26 @@ export type EsitoAttoCitato =
   // Più Atti possibili: nessun collegamento.
   | { esito: "ambiguo" };
 
+// Prefissi degli atti nazionali italiani: numero e anno sono progressivi
+// nell'anno per tutti i tipi, quindi «D.L. 177/2026» e «177/2026» sono lo
+// stesso Atto. Non si tolgono prefissi come «A.C.» o «A.S.» (Camera e Senato
+// numerano per conto loro) né «Direttiva»/«Regolamento» (stesso numero UE,
+// Atti diversi).
+const PREFISSO_ITALIANO =
+  /^(?:decreto[\s-]*legislativo|decreto[\s-]*legge|legge|d\.?\s*lgs\.?|d\.?\s*p\.?\s*r\.?|d\.?\s*l\.?|l\.?)\s*(?=\d)/i;
+// «final», «definitivo» e «def.» sono la stessa proposta della Commissione.
+const SUFFISSO_PROPOSTA = /\s+(?:final|definitivo|def\.?)$/i;
+
+// Chiave per riconoscere lo stesso Atto scritto in modi diversi. L'indice del
+// DB è più stretto (solo spazi e maiuscole): fa da rete per le scritture in
+// contemporanea, questa chiave decide prima.
 export function chiaveIdentificativo(identificativo: string): string {
-  return identificativo.replace(/\s+/g, "").toUpperCase();
+  return identificativo
+    .trim()
+    .replace(PREFISSO_ITALIANO, "")
+    .replace(SUFFISSO_PROPOSTA, "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
 }
 
 // Solo lettere e cifre, minuscole e senza accenti: spazi e punteggiatura non
