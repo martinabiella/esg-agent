@@ -29,8 +29,33 @@ export type EsitoAttoCitato =
   // Più Atti possibili: nessun collegamento.
   | { esito: "ambiguo" };
 
-export function chiaveIdentificativo(identificativo: string): string {
+// Prefissi di leggi, decreti-legge e decreti legislativi: numero e anno sono
+// progressivi nell'anno per tutti e tre, quindi «D.L. 177/2026» e «177/2026»
+// sono lo stesso Atto. Non si tolgono «D.P.R.» (serie di numeri a parte),
+// «A.C.» e «A.S.» (Camera e Senato numerano per conto loro) né «Direttiva» e
+// «Regolamento» (stesso numero UE, Atti diversi). Dopo il prefisso si ignora
+// un eventuale «n.».
+const PREFISSO_ITALIANO =
+  /^(?:decreto[\s-]*legislativo|decreto[\s-]*legge|legge|d\.?\s*lgs\.?|d\.?\s*l\.?|l\.?)\s*(?:n(?:r|\.|umero)?\.?\s*)?(?=\d)/i;
+// «final», «definitivo» e «def.» sono la stessa proposta della Commissione.
+const SUFFISSO_PROPOSTA = /\s+(?:final|definitivo|def\.?)$/i;
+
+// Grafia esatta: solo spazi e maiuscole, come l'indice del DB.
+function chiaveEsatta(identificativo: string): string {
   return identificativo.replace(/\s+/g, "").toUpperCase();
+}
+
+// Chiave per riconoscere lo stesso Atto scritto in modi diversi. L'indice del
+// DB è più stretto (solo spazi e maiuscole) e non vede queste varianti: se due
+// Ricerche in contemporanea scrivono lo stesso Atto con grafie diverse, ne
+// nascono due.
+export function chiaveIdentificativo(identificativo: string): string {
+  return identificativo
+    .trim()
+    .replace(PREFISSO_ITALIANO, "")
+    .replace(SUFFISSO_PROPOSTA, "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
 }
 
 // Solo lettere e cifre, minuscole e senza accenti: spazi e punteggiatura non
@@ -60,6 +85,14 @@ function esitoPer(trovati: readonly AttoCatalogo[]): EsitoAttoCitato {
 export function trovaAttoCitato(citato: AttoCitato, atti: readonly AttoCatalogo[]): EsitoAttoCitato {
   const identificativo = citato.identificativoUfficiale?.trim();
   if (identificativo) {
+    // Prima la grafia esatta: un Atto del catalogo scritto come la citazione
+    // vince sempre, anche se un altro ha la stessa chiave allargata.
+    const esatta = chiaveEsatta(identificativo);
+    const identici = atti.filter(
+      (a) => a.identificativoUfficiale !== null && chiaveEsatta(a.identificativoUfficiale) === esatta,
+    );
+    if (identici.length > 0) return esitoPer(identici);
+
     const chiave = chiaveIdentificativo(identificativo);
     const trovati = atti.filter(
       (a) => a.identificativoUfficiale !== null && chiaveIdentificativo(a.identificativoUfficiale) === chiave,

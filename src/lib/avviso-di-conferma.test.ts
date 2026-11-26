@@ -11,7 +11,7 @@ const vuote: RigheAvviso = {
 
 test("un Atto con contenuti generati, un cambio di Stato e una Notizia è una sola voce con tre motivi", () => {
   const { atti, notizie } = costruisciAvviso({
-    attiDaConfermare: [{ attoId: 1, titolo: "CSDDD Omnibus", aggiornatoIl: "2026-11-01T10:00:00.000Z" }],
+    attiDaConfermare: [{ attoId: 1, titolo: "CSDDD Omnibus", aggiornatoIl: "2026-11-01T10:00:00.000Z", senzaSettori: false }],
     cambiDiStato: [{ id: 4, attoId: 1, titolo: "CSDDD Omnibus", stato: "approvato", data: "2026-11-10" }],
     notizieSuAtti: [{ notiziaId: 7, notiziaTitolo: "Slitta l'obbligo", notiziaCreataIl: "2026-01-01T00:00:00.000Z", attoId: 1, attoTitolo: "CSDDD Omnibus" }],
     notizieSenzaAtto: [],
@@ -21,6 +21,7 @@ test("un Atto con contenuti generati, un cambio di Stato e una Notizia è una so
     attoId: 1,
     titolo: "CSDDD Omnibus",
     contenutiGenerati: true,
+    senzaSettori: false,
     cambiDiStato: [{ id: 4, stato: "approvato", data: "2026-11-10" }],
     notizie: [{ id: 7, titolo: "Slitta l'obbligo" }],
     ultimoMovimento: "2026-11-10",
@@ -63,6 +64,7 @@ const voceAtto = (attoId: number, ultimoMovimento = "2026-01-01") => ({
   attoId,
   titolo: `Atto ${attoId}`,
   contenutiGenerati: true,
+  senzaSettori: false,
   cambiDiStato: [],
   notizie: [],
   ultimoMovimento,
@@ -109,4 +111,23 @@ test("una Notizia entra nell'Avviso solo se trovata negli ultimi 30 giorni", () 
   const adesso = new Date("2026-11-24T12:00:00.000Z");
   const limite = limiteNotizieAvviso(adesso);
   assert.equal(limite.toISOString(), "2026-10-25T12:00:00.000Z");
+});
+
+test("un Atto dell'agente senza Settori compare nell'Avviso con il motivo «Settori da assegnare»", () => {
+  const { atti } = costruisciAvviso({
+    ...vuote,
+    attiDaConfermare: [
+      { attoId: 67, titolo: "Omnibus VIII", aggiornatoIl: "2026-11-25T10:00:00.000Z", senzaSettori: true },
+      { attoId: 68, titolo: "CSRD", aggiornatoIl: "2026-11-25T10:00:00.000Z", senzaSettori: false },
+    ],
+  });
+  assert.deepEqual(atti.map((a) => [a.attoId, a.senzaSettori]), [[67, true], [68, false]]);
+});
+
+test("un Atto che compare solo per un cambio di Stato non è senza Settori", () => {
+  const { atti } = costruisciAvviso({
+    ...vuote,
+    cambiDiStato: [{ id: 5, attoId: 2, titolo: "CSRD", stato: "in_vigore", data: "2026-05-01" }],
+  });
+  assert.equal(atti[0].senzaSettori, false);
 });

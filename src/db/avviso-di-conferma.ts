@@ -2,7 +2,7 @@ import { and, asc, eq, gte, inArray, isNull, notExists, sql } from "drizzle-orm"
 import { db } from "./index";
 import { impattoPerAtto } from "./applicabilita";
 import { cambiDiStatoNonVisti } from "./cambi-di-stato";
-import { attoNormativo, notizia, notiziaAtto, statoStorico } from "./schema";
+import { attoNormativo, attoSettore, notizia, notiziaAtto, statoStorico } from "./schema";
 import {
   costruisciAvviso,
   limiteNotizieAvviso,
@@ -19,6 +19,7 @@ async function righeAvviso(): Promise<RigheAvviso> {
         attoId: attoNormativo.id,
         titolo: attoNormativo.titolo,
         aggiornatoIl: attoNormativo.aggiornatoIl,
+        senzaSettori: sql<boolean>`NOT ${attoNormativo.tuttiISettori} AND NOT EXISTS (SELECT 1 FROM ${attoSettore} WHERE ${attoSettore.attoId} = ${attoNormativo.id})`,
       })
       .from(attoNormativo)
       .where(
