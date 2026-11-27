@@ -77,3 +77,17 @@ test("creaAtto da una Notizia già collegata a un Atto: non crea un secondo Atto
   assert.deepEqual(secondo, { ok: false, motivo: "notizia_gia_collegata" });
   assert.deepEqual((await postgres.query(`SELECT count(*)::int AS n FROM atto_normativo`)).rows, [{ n: 1 }]);
 });
+
+test("creaAtto con una Relazione: salva il collegamento all'altro Atto", async (t) => {
+  const postgres = await preparaEsecuzione(t);
+  const { creaAtto } = await import("./atti");
+  await postgres.exec(`
+    INSERT INTO atto_normativo (id, titolo, giurisdizione, tipo, stato)
+    VALUES (55, 'Atto esistente', 'ue', 'direttiva', 'in_vigore');
+  `);
+
+  const esito = await creaAtto({ ...campi(), relazioni: [{ tipo: "modifica", attoId: 55 }] });
+
+  assert.equal(esito.ok, true);
+  assert.deepEqual((await postgres.query(`SELECT a_atto_id, tipo FROM relazione_atti`)).rows, [{ a_atto_id: 55, tipo: "modifica" }]);
+});

@@ -211,7 +211,7 @@ function relazioniValues(valori: CampiAtto["relazioni"]) {
   if (valori.length === 0) return sql`SELECT id, NULL::integer, NULL::tipo_relazione FROM nuovo WHERE false`;
   return sql`SELECT nuovo.id, righe.atto_id, righe.tipo
     FROM nuovo CROSS JOIN (VALUES ${sql.join(
-      valori.map((r) => sql`(${r.attoId}, ${r.tipo}::tipo_relazione)`),
+      valori.map((r) => sql`(${r.attoId}::integer, ${r.tipo}::tipo_relazione)`),
       sql`, `,
     )}) AS righe(atto_id, tipo)`;
 }
@@ -219,7 +219,7 @@ function relazioniValues(valori: CampiAtto["relazioni"]) {
 function relazioniDaConservare(valori: CampiAtto["relazioni"]) {
   if (valori.length === 0) return sql`false`;
   return sql`NOT EXISTS (SELECT 1 FROM (VALUES ${sql.join(
-    valori.map((r) => sql`(${r.attoId}, ${r.tipo}::tipo_relazione)`),
+    valori.map((r) => sql`(${r.attoId}::integer, ${r.tipo}::tipo_relazione)`),
     sql`, `,
   )}) AS righe(atto_id, tipo)
     WHERE righe.atto_id = relazione_atti.a_atto_id AND righe.tipo = relazione_atti.tipo)`;
@@ -349,7 +349,7 @@ export async function aggiornaAtto(id: number, valori: CampiAtto): Promise<Esito
         INSERT INTO relazione_atti (da_atto_id, a_atto_id, tipo)
         SELECT ${id}, righe.atto_id, righe.tipo
         FROM (VALUES ${valori.relazioni.length ? sql.join(
-          valori.relazioni.map((r) => sql`(${r.attoId}, ${r.tipo}::tipo_relazione)`),
+          valori.relazioni.map((r) => sql`(${r.attoId}::integer, ${r.tipo}::tipo_relazione)`),
           sql`, `,
         ) : sql`(NULL::integer, NULL::tipo_relazione)`}) AS righe(atto_id, tipo)
         WHERE righe.atto_id IS NOT NULL
