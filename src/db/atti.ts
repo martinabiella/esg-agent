@@ -211,7 +211,7 @@ function relazioniValues(valori: CampiAtto["relazioni"]) {
   if (valori.length === 0) return sql`SELECT id, NULL::integer, NULL::tipo_relazione FROM nuovo WHERE false`;
   return sql`SELECT nuovo.id, righe.atto_id, righe.tipo
     FROM nuovo CROSS JOIN (VALUES ${sql.join(
-      valori.map((r) => sql`(${r.attoId}, ${r.tipo}::tipo_relazione)`),
+      valori.map((r) => sql`(${r.attoId}::integer, ${r.tipo}::tipo_relazione)`),
       sql`, `,
     )}) AS righe(atto_id, tipo)`;
 }
@@ -219,7 +219,7 @@ function relazioniValues(valori: CampiAtto["relazioni"]) {
 function relazioniDaConservare(valori: CampiAtto["relazioni"]) {
   if (valori.length === 0) return sql`false`;
   return sql`NOT EXISTS (SELECT 1 FROM (VALUES ${sql.join(
-    valori.map((r) => sql`(${r.attoId}, ${r.tipo}::tipo_relazione)`),
+    valori.map((r) => sql`(${r.attoId}::integer, ${r.tipo}::tipo_relazione)`),
     sql`, `,
   )}) AS righe(atto_id, tipo)
     WHERE righe.atto_id = relazione_atti.a_atto_id AND righe.tipo = relazione_atti.tipo)`;
@@ -237,9 +237,9 @@ function datiAtto(valori: CampiAtto) {
 export type EsitoScritturaAtto =
   | { ok: true; id: number }
   | { ok: false; motivo: "identificativo_duplicato"; duplicatoId: number | null }
-  | { ok: false; motivo: "non_trovato" | "collegamento_inesistente" };
+  | { ok: false; motivo: "non_trovato" | "collegamento_inesistente" | "notizia_gia_collegata" };
 
-export async function creaAtto(valori: CampiAtto): Promise<EsitoScritturaAtto> {
+export async function creaAtto(valori: CampiAtto, daNotiziaId: number | null = null): Promise<EsitoScritturaAtto> {
   const nuoviTemi = valori.nuovoTema;
   try {
     const risultato = await db.execute<{ id: number }>(sql`
@@ -258,7 +258,8 @@ export async function creaAtto(valori: CampiAtto): Promise<EsitoScritturaAtto> {
           (titolo, identificativo_ufficiale, giurisdizione, tipo, stato, summary, url_testo,
            criteri_soglie, criteri_testo, criteri_confermati, tutti_i_settori, non_rilevante,
            recepimento_entro, provenienza_contenuti, aggiornato_il)
-        VALUES (${datiAtto(valori)})
+        SELECT ${datiAtto(valori)}
+        WHERE ${daNotiziaId === null} OR NOT EXISTS (SELECT 1 FROM notizia_atto WHERE notizia_id = ${daNotiziaId}::int)
         RETURNING id
       ), inserisci_settori AS (
         INSERT INTO atto_settore (atto_id, settore_id)
@@ -272,8 +273,13 @@ export async function creaAtto(valori: CampiAtto): Promise<EsitoScritturaAtto> {
       ), inserisci_relazioni AS (
         INSERT INTO relazione_atti (da_atto_id, a_atto_id, tipo)
         ${relazioniValues(valori.relazioni)}
+      ), collega_notizia AS (
+        INSERT INTO notizia_atto (notizia_id, atto_id, controllata_il)
+        SELECT ${daNotiziaId}::int, nuovo.id, now() FROM nuovo WHERE ${daNotiziaId !== null}
       )
       SELECT id FROM nuovo`);
+    // Nessuna riga: la Notizia è stata collegata a un Atto da un'altra richiesta.
+    if (risultato.rows.length === 0) return { ok: false, motivo: "notizia_gia_collegata" };
     return { ok: true, id: risultato.rows[0].id };
   } catch (e) {
     const codice = codiceErrore(e);
@@ -343,7 +349,7 @@ export async function aggiornaAtto(id: number, valori: CampiAtto): Promise<Esito
         INSERT INTO relazione_atti (da_atto_id, a_atto_id, tipo)
         SELECT ${id}, righe.atto_id, righe.tipo
         FROM (VALUES ${valori.relazioni.length ? sql.join(
-          valori.relazioni.map((r) => sql`(${r.attoId}, ${r.tipo}::tipo_relazione)`),
+          valori.relazioni.map((r) => sql`(${r.attoId}::integer, ${r.tipo}::tipo_relazione)`),
           sql`, `,
         ) : sql`(NULL::integer, NULL::tipo_relazione)`}) AS righe(atto_id, tipo)
         WHERE righe.atto_id IS NOT NULL

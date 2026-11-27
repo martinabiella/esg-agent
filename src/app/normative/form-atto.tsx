@@ -176,7 +176,7 @@ function Relazioni({ valori, atti, onChange, errore }: { valori: ValoriModuloAtt
   );
 }
 
-export function FormAtto({ azione, id, iniziali, settori, temi, atti, etichettaInvio, onAnnulla, onSalvato }: { azione: Azione; id?: number; iniziali: ValoriModuloAtto; settori: VoceAtto[]; temi: VoceAtto[]; atti: AttoVoce[]; etichettaInvio: string; onAnnulla?: () => void; onSalvato?: (id: number, esito: "creato" | "modificato") => void }) {
+export function FormAtto({ azione, id, iniziali, settori, temi, atti, etichettaInvio, tornaA, onAnnulla, onSalvato }: { azione: Azione; id?: number; iniziali: ValoriModuloAtto; settori: VoceAtto[]; temi: VoceAtto[]; atti: AttoVoce[]; etichettaInvio: string; tornaA?: string; onAnnulla?: () => void; onSalvato?: (id: number, esito: "creato" | "modificato") => void }) {
   const router = useRouter();
   const [stato, esegui, inCorso] = useActionState(azione, undefined);
   const valori = stato?.valori ?? iniziali;
@@ -315,7 +315,7 @@ export function FormAtto({ azione, id, iniziali, settori, temi, atti, etichettaI
       {stato?.errore && <Alert variant="destructive"><AlertDescription>{stato.errore}</AlertDescription></Alert>}
       <div className="flex items-center gap-3 border-t pt-4">
         <Button type="submit" disabled={inCorso}>{inCorso ? "Salvataggio…" : etichettaInvio}</Button>
-        <Button type="button" variant="ghost" onClick={() => onAnnulla ? onAnnulla() : router.push(id ? `/normative/${id}` : "/normative")}>Annulla</Button>
+        <Button type="button" variant="ghost" onClick={() => onAnnulla ? onAnnulla() : router.push(tornaA ?? (id ? `/normative/${id}` : "/normative"))}>Annulla</Button>
       </div>
     </form>
   );

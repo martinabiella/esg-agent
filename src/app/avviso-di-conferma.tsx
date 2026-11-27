@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { io } from "next/cache";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { avvisoDiConferma, type NovitaMostrate } from "@/db/avviso-di-conferma";
 import { titoloAvviso } from "@/lib/avviso-di-conferma";
@@ -88,11 +89,16 @@ export async function AvvisoDiConferma() {
                   <Link href={`/notizie?notizia=${n.id}`} className="font-medium hover:underline">
                     {n.titolo}
                   </Link>
-                  <PulsanteControllato
-                    azione={segnaNotiziaControllataAzione}
-                    id={n.id}
-                    etichetta="Segna come controllata"
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" size="sm" render={<Link href={`/normative/nuovo?notizia=${n.id}`} />}>
+                      Crea Atto da questa Notizia
+                    </Button>
+                    <PulsanteControllato
+                      azione={segnaNotiziaControllataAzione}
+                      id={n.id}
+                      etichetta="Segna come controllata"
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
